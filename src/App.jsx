@@ -7,6 +7,11 @@ import ProviderRegister from './pages/PetProvider/Register'
 import GuardianLogIn from './pages/PetGuardian/LogIn'
 import GuardianRegister from './pages/PetGuardian/Register'
 import GuardianDashboard from './pages/PetGuardian/GuardianDashboard'
+import ProfileModal from './pages/PetGuardian/ProfileModal'
+import AddPetModal from './pages/PetProvider/AddPetModal'
+import PetModal from './pages/PetProvider/PetModal'
+import ApplicationModal from './pages/PetProvider/ApplicationModal'
+import MessageModal from './pages/PetProvider/MessageModal'
 
 export default function App() {
   const ProviderWithPet = () => {
@@ -37,16 +42,17 @@ export default function App() {
       <Route path="/provider/register" element={<ProviderRegister />} />
       <Route path="/guardian/login" element={<GuardianLogIn />} />
       <Route path="/guardian/register" element={<GuardianRegister />} />
-      <Route path="/guardian-dashboard" element={<GuardianDashboard />} />
-      <Route path="/provider-dashboard" element={<ProviderDashboard />} />
+      <Route path="/guardian/dashboard" element={<GuardianDashboard />} />
+      <Route path="/guardian-dashboard" element={<Navigate to="/guardian/dashboard" replace />} />
+      <Route path="/provider/dashboard" element={<ProviderDashboard />} />
+      <Route path="/provider-dashboard" element={<Navigate to="/provider/dashboard" replace />} />
       <Route path="/provider/profile" element={<ProviderDashboard openProfileOnMount />} />
       <Route path="/provider/add-pet" element={<ProviderWithAddPet />} />
       <Route path="/provider/pet/:petName" element={<ProviderWithPet />} />
       <Route path="/provider/application/:appName" element={<ProviderWithApplication />} />
       <Route path="/provider/message/:msgName" element={<ProviderWithMessage />} />
-      <Route path="/provider/dashboard" element={<Navigate to="/provider-dashboard" replace />} />
       <Route path="/guardian/profile" element={<GuardianDashboard openProfileOnMount />} />
-      <Route path="/guardian/dashboard" element={<Navigate to="/guardian-dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

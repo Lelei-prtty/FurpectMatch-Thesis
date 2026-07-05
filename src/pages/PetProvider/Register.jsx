@@ -18,7 +18,7 @@ export default function ProviderRegister() {
       alert('Passwords do not match.')
       return
     }
-    navigate('/provider-dashboard')
+    navigate('/provider/dashboard', { replace: true })
   }
 
   return (

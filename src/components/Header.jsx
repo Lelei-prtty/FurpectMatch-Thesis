@@ -16,7 +16,7 @@ export default function Header() {
 
         {/* Navigation Links */}
         <div className="hidden md:flex gap-8">
-          <Link to="/" className="text-gray-700 hover:text-gray-900 font-medium">For Pet Guardians</Link>
+          <Link to="/guardian/login" className="text-gray-700 hover:text-gray-900 font-medium">For Pet Guardians</Link>
           <Link to="/provider/login" className="text-gray-700 hover:text-gray-900 font-medium">For Pet Providers</Link>
           <a href="#" className="text-gray-700 hover:text-gray-900 font-medium">How It Works</a>
           <a href="#" className="text-gray-700 hover:text-gray-900 font-medium">Resources</a>

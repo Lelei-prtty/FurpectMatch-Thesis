@@ -12,7 +12,7 @@ export default function ProviderLogIn() {
       alert('Please enter your email and password.')
       return
     }
-    navigate('/provider-dashboard')
+    navigate('/provider/dashboard', { replace: true })
   }
 
   return (

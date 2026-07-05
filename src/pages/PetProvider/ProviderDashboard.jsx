@@ -19,13 +19,13 @@ import {
   Plus,
   Search,
 } from 'lucide-react';
-import SideBar from '../PetProvider/SideBar.jsx';
-import Profile from '..PetProvider/ProfileModal.jsx';
-import PetModal from '..PetProvider/PetModal.jsx';
-import ApplicationModal from '../PetProvider/ApplicationModal.jsx';
-import MessageModal from '../PetProvider/MessageModal.jsx';
+import SideBar from './pages/PetProvider/SideBar.jsx';
+import Profile from './pages/PetProvider/ProfileModal.jsx';
+import PetModal from './pages/PetProvider/PetModal.jsx'
+import ApplicationModal from './pages/PetProvider/ApplicationModal.jsx'
+import MessageModal from './pages/PetProvider/MessageModal.jsx'
 import AddPetModal from '../PetProvider/AddPetModal.jsx';
-import { applications, donations, messagesList, pets } from '../../Data/ProviderSampleData.jsx';
+import { applications, donations, messagesList, pets } from '../../Data/ProviderSampleData';
 
 const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameOnMount, openApplicationNameOnMount, openMessageNameOnMount }) => {
   const [activeTab, setActiveTab] = useState('dashboard');

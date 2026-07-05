@@ -12,7 +12,7 @@ export default function GuardianLogIn() {
       alert('Please enter your email and password.')
       return
     }
-    navigate('/guardian-dashboard')
+    navigate('/guardian/dashboard', { replace: true })
   }
 
   return (

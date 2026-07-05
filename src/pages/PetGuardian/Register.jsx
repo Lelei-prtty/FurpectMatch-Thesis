@@ -18,7 +18,7 @@ export default function GuardianRegister() {
       alert('Passwords do not match.')
       return
     }
-    navigate('/guardian-dashboard')
+    navigate('/guardian/dashboard', { replace: true })
   }
 
   return (
