@@ -20,7 +20,7 @@ export default function GuardianDashboard({ openProfileOnMount }) {
     } else {
       setActiveTab(id)
     }
-  }
+  } 
 
   useEffect(() => {
     if (openProfileOnMount) {
