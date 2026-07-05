@@ -19,23 +19,47 @@ import {
   Search,
 } from 'lucide-react';
 import SideBar from './SideBar';
-import { applications, donations, messagesList, pets } from '../../Data/SampleData';
+import PetModal from './PetModal';
+import ApplicationModal from './ApplicationModal';
+import MessageModal from './MessageModal';
+import AddPetModal from './AddPetModal';
+import { applications, donations, messagesList, pets } from '../../Data/ProviderSampleData';
 
 const ProviderDashboard = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [selectedPetIndex, setSelectedPetIndex] = useState(0);
-  const [showModal, setShowModal] = useState(false);
+  const [petList, setPetList] = useState(pets);
+  const [selectedPet, setSelectedPet] = useState(null);
+  const [selectedApplication, setSelectedApplication] = useState(null);
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [showAddPetModal, setShowAddPetModal] = useState(false);
   const [notifications, setNotifications] = useState(2);
   const [messages, setMessages] = useState(3);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const messages_list = messagesList;
+  const filteredPets = petList.filter((pet) =>
+    pet.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    pet.breed.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredApplications = applications.filter((app) =>
+    app.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    app.pet.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredMessages = messagesList.filter((msg) =>
+    msg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    msg.message.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalPets = petList.length;
+  const availablePets = petList.filter((pet) => pet.status === 'Available').length;
+  const totalApplications = applications.length;
 
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'pets', label: 'My Pets', icon: Heart },
-    { id: 'applications', label: 'Applications', icon: Users, badge: 12 },
-    { id: 'adoptions', label: 'Adoptions', icon: Clock },
+    { id: 'applications', label: 'Applications', icon: Users, badge: totalApplications },
     { id: 'messages', label: 'Messages', icon: MessageSquare, badge: messages },
     { id: 'reviews', label: 'Reviews & Ratings', icon: Star },
     { id: 'donations', label: 'Donations', icon: Gift },
@@ -48,16 +72,69 @@ const ProviderDashboard = () => {
     }
   };
 
-  const handleAddPet = () => {
-    setShowModal(true);
+  const openPetModal = (pet) => {
+    setSelectedPet(pet);
   };
 
-  const closeModal = () => {
-    setShowModal(false);
+  const closePetModal = () => {
+    setSelectedPet(null);
+  };
+
+  const openApplicationModal = (application) => {
+    setSelectedApplication(application);
+  };
+
+  const closeApplicationModal = () => {
+    setSelectedApplication(null);
+  };
+
+  const openMessageModal = (message) => {
+    setSelectedMessage(message);
+  };
+
+  const closeMessageModal = () => {
+    setSelectedMessage(null);
+  };
+
+  const openAddPetModal = () => {
+    setShowAddPetModal(true);
+  };
+
+  const closeAddPetModal = () => {
+    setShowAddPetModal(false);
+  };
+
+  const addNewPet = (newPet) => {
+    setPetList((current) => [newPet, ...current]);
+    closeAddPetModal();
   };
 
   const handleDonate = () => {
     alert('Opening donation modal...');
+  };
+
+  const getActivePageTitle = () => {
+    const currentItem = navigationItems.find((item) => item.id === activeTab);
+    return currentItem?.label || 'Dashboard';
+  };
+
+  const getActivePageSubtitle = () => {
+    switch (activeTab) {
+      case 'dashboard':
+        return ['Overall view of the statistics and insights.'];
+      case 'pets':
+        return ['Keep your adoption listings updated and showcase each pet’s story.'];
+      case 'applications':
+        return ['Review incoming applications and move the best matches forward.'];
+      case 'messages':
+        return ['Respond to pet inquiries and keep every conversation on track.'];
+      case 'reviews':
+        return ['Track reviews and ratings to maintain trust with adopters.'];
+      case 'donations':
+        return ['Manage donations and support the rescue efforts that matter most.'];
+      default:
+        return ['Open your conversations and respond quickly.'];
+    }
   };
 
   const getStatusColor = (status) => {
@@ -82,6 +159,8 @@ const ProviderDashboard = () => {
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search pets, applications..."
               className="w-full bg-white pl-12 pr-4 py-3 rounded-xl border border-gray-200 shadow-sm focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100 text-sm sm:text-base"
             />
@@ -92,11 +171,11 @@ const ProviderDashboard = () => {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {[
-          { label: 'Total Pets', value: '18', subtext: '↑ 2 this month' },
-          { label: 'Active Adoptions', value: '7', subtext: '↑ 2 pending pickups' },
-          { label: 'Applications', value: '12', subtext: '↑ 4 new today' },
+          { label: 'Total Pets', value: totalPets, subtext: `${availablePets} available` },
+          { label: 'Available Listings', value: availablePets, subtext: 'Ready for adoption' },
+          { label: 'Applications', value: totalApplications, subtext: 'New requests' },
           { label: 'Avg. Rating', value: '4.8', subtext: '★★★★★' },
-          { label: 'Messages', value: messages, subtext: 'unread' },
+          { label: 'Messages', value: messages, subtext: 'Unread' },
         ].map((stat, i) => (
           <div key={i} className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
             <div>
@@ -111,7 +190,6 @@ const ProviderDashboard = () => {
       {/* My Pets Section */}
       <div>
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold text-gray-900">My Pets</h2>
           <button
             onClick={() => setActiveTab('pets')}
             className="text-purple-600 hover:text-purple-700 text-sm font-medium"
@@ -120,107 +198,162 @@ const ProviderDashboard = () => {
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 overflow-x-auto">
-          {pets.map((pet, index) => (
-            <div key={index} className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-              <div className="h-32 overflow-hidden bg-gray-100">
-                <img src={pet.image} alt={pet.name} className="w-full h-full object-cover" />
-              </div>
-              <div className="p-4">
-                <h3 className="font-bold text-lg text-black">{pet.name}</h3>
-                <p className="text-gray-600 text-sm">{pet.breed} • {pet.age}</p>
-                <div className="mt-3 flex gap-2">
-                  <span className={`text-xs font-semibold px-2 py-1 rounded ${getStatusColor(pet.status)}`}>
-                    {pet.status}
-                  </span>
-                  <span className="text-xs text-gray-600 px-2 py-1">{pet.health}</span>
+          {filteredPets.length > 0 ? (
+            filteredPets.map((pet, index) => (
+              <div key={`${pet.name}-${index}`} className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <div className="h-32 overflow-hidden bg-gray-100">
+                  <img src={pet.image} alt={pet.name} className="w-full h-full object-cover" />
+                </div>
+                <div className="p-4">
+                  <h3 className="font-bold text-lg text-black">{pet.name}</h3>
+                  <p className="text-gray-600 text-sm">{pet.breed} • {pet.age}</p>
+                  <div className="mt-3 flex gap-2">
+                    <span className={`text-xs font-semibold px-2 py-1 rounded ${getStatusColor(pet.status)}`}>
+                      {pet.status}
+                    </span>
+                    <span className="text-xs text-gray-600 px-2 py-1">{pet.health}</span>
+                  </div>
                 </div>
               </div>
+            ))
+          ) : (
+            <div className="col-span-full rounded-[32px] bg-white p-8 text-center shadow-sm">
+              <p className="text-gray-700">No pets match your search yet. Try a different name or breed.</p>
             </div>
-          ))}
+          )}
         </div>
       </div>
 
     </div>
   );
 
+   {/* PetModal here. */}
   const renderPets = () => (
     <div className="space-y-6">
-      <h1 className="text-4xl font-bold text-gray-900">My Pets</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {pets.map((pet, index) => (
-          <div
-            key={index}
-            className="bg-white rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
-            onClick={() => setSelectedPetIndex(index)}
-          >
-            <div className="h-48 overflow-hidden bg-gray-100">
-              <img src={pet.image} alt={pet.name} className="w-full h-full object-cover" />
-            </div>
-            <div className="p-6">
-              <h3 className="font-bold text-2xl mb-2 text-black">{pet.name}</h3>
-              <p className="text-gray-600 mb-4">{pet.breed} • {pet.age}</p>
-              <div className="space-y-2">
-                <div className={`text-sm font-semibold px-3 py-1 rounded inline-block ${getStatusColor(pet.status)}`}>
-                  {pet.status}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          type="button"
+          onClick={openAddPetModal}
+          className="inline-flex items-center gap-2 rounded-full bg-purple-600 px-5 py-3 text-sm font-semibold text-black transition hover:bg-purple-700"
+        >
+          <Plus className="h-4 w-4" />
+          Add pet for adoption
+        </button>
+      </div>
+
+      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+        {filteredPets.length > 0 ? (
+          filteredPets.map((pet, index) => (
+            <div key={`${pet.name}-${index}`} className="overflow-hidden rounded-[32px] bg-white shadow-sm transition hover:shadow-md">
+              <div className="h-56 overflow-hidden bg-gray-100">
+                <img src={pet.image} alt={pet.name} className="h-full w-full object-cover" />
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <p className="text-sm font-semibold text-gray-500">{pet.breed}</p>
+                  <h3 className="mt-2 text-2xl font-bold text-gray-900">{pet.name}</h3>
+                  <p className="mt-1 text-sm text-gray-600">{pet.age}</p>
                 </div>
-                <p className="text-sm text-gray-700">{pet.health}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-full px-3 py-1 text-sm font-semibold ${getStatusColor(pet.status)}`}>
+                    {pet.status}
+                  </span>
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-600">{pet.health}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openPetModal(pet)}
+                  className="w-full rounded-full bg-purple-600 px-4 py-3 text-sm font-semibold text-black transition hover:bg-purple-700"
+                >
+                  View profile
+                </button>
               </div>
             </div>
+          ))
+        ) : (
+          <div className="col-span-full rounded-[32px] bg-white p-8 text-center shadow-sm">
+            <p className="text-gray-700">No pets match your search. Try a different name or breed.</p>
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
 
+  {/* ApplicationModal here. */}
   const renderApplications = () => (
     <div className="space-y-6">
-      <h1 className="text-4xl font-bold text-gray-900">Applications</h1>
       <div className="space-y-4">
-        {applications.map((app, index) => (
-          <div key={index} className="bg-white p-6 rounded-lg flex items-center justify-between hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-4">
-              <img src={app.avatar} alt={app.name} className="w-16 h-16 rounded-full object-cover" />
-              <div>
-                <p className="font-semibold text-lg text-black">{app.name}</p>
-                <p className="text-gray-600">Applied for {app.pet}</p>
-                <p className="text-sm text-gray-500 mt-1">{app.time}</p>
+        {filteredApplications.length > 0 ? (
+          filteredApplications.map((app, index) => (
+            <div key={`${app.name}-${index}`} className="rounded-[32px] bg-white p-6 shadow-sm transition hover:shadow-md">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-4">
+                  <img src={app.avatar} alt={app.name} className="h-16 w-16 rounded-full object-cover" />
+                  <div>
+                    <p className="text-lg font-semibold text-gray-900">{app.name}</p>
+                    <p className="text-sm text-gray-600">Applied for {app.pet}</p>
+                    <p className="text-sm text-gray-400">{app.time}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className={`rounded-full px-3 py-1 text-sm font-semibold ${getStatusColor(app.status)}`}>
+                    {app.status}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => openApplicationModal(app)}
+                    className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-purple-500 hover:text-purple-700"
+                  >
+                    View details
+                  </button>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <span className={`text-sm font-semibold px-3 py-1 rounded ${getStatusColor(app.status)}`}>
-                {app.status}
-              </span>
-              <button className="p-2 hover:bg-gray-100 rounded-lg">
-                <MoreVertical className="w-5 h-5 text-gray-600" />
-              </button>
-            </div>
+          ))
+        ) : (
+          <div className="rounded-[32px] bg-white p-8 text-center shadow-sm">
+            <p className="text-gray-700">No applications match your search yet.</p>
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
 
+   {/* MessageModal here. */}
   const renderMessages = () => (
     <div className="space-y-6">
-      <h1 className="text-4xl font-bold text-gray-900">Messages</h1>
-      <div className="max-w-2xl space-y-2">
-        {messages_list.map((msg, index) => (
-          <div key={index} className="bg-white p-4 rounded-lg flex items-center gap-3 hover:bg-gray-50 cursor-pointer">
-            <img src={msg.avatar} alt={msg.name} className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
-            <div className="flex-1">
-              <p className="font-semibold">{msg.name}</p>
-              <p className="text-sm text-gray-600">{msg.message}</p>
-            </div>
-            <p className="text-xs text-gray-500">{msg.time}</p>
+      <div className="space-y-4">
+        {filteredMessages.length > 0 ? (
+          filteredMessages.map((msg, index) => (
+            <button
+              key={`${msg.name}-${index}`}
+              type="button"
+              onClick={() => openMessageModal(msg)}
+              className="w-full rounded-[32px] bg-white p-4 text-left shadow-sm transition hover:shadow-md"
+            >
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex items-center gap-4">
+                  <img src={msg.avatar} alt={msg.name} className="h-14 w-14 rounded-full object-cover" />
+                  <div>
+                    <p className="font-semibold text-gray-900">{msg.name}</p>
+                    <p className="text-sm text-gray-600">{msg.message}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500">{msg.time}</p>
+              </div>
+            </button>
+          ))
+        ) : (
+          <div className="rounded-[32px] bg-white p-8 text-center shadow-sm">
+            <p className="text-gray-700">No messages match your search yet.</p>
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
 
   const renderReviews = () => (
     <div className="space-y-6">
-      <h1 className="text-4xl font-bold text-gray-900">Reviews & Ratings</h1>
       <div className="bg-white rounded-lg p-6 shadow-sm">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-center mb-6">
           {[
@@ -249,7 +382,6 @@ const ProviderDashboard = () => {
   const renderDonations = () => (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-4xl font-bold text-gray-900">Donations</h1>
         <button
           onClick={handleDonate}
           className="bg-purple-600 hover:bg-purple-700 text-black font-semibold py-2 px-6 rounded-lg flex items-center gap-2 transition-colors"
@@ -308,7 +440,6 @@ const ProviderDashboard = () => {
 
       {/* Featured Causes */}
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Featured Causes</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {[
             { title: 'Emergency Rescue Fund', desc: 'Help us rescue animals in critical conditions', raised: '₱8,500', goal: '₱10,000' },
@@ -368,8 +499,12 @@ const ProviderDashboard = () => {
         {/* Top Bar */}
         <div className="bg-white border-b border-gray-200 px-4 py-4 sm:px-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sticky top-0 z-30">
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">Good morning, Username!</h1>
-            <p className="text-sm sm:text-base text-gray-600 mt-2">Here&apos;s what&apos;s happening with your pet care today.</p>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">{getActivePageTitle()}</h1>
+            {getActivePageSubtitle().map((line, index) => (
+              <p key={index} className="text-sm sm:text-base text-gray-600 mt-2">
+                {line}
+              </p>
+            ))}
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
             <button className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -408,39 +543,10 @@ const ProviderDashboard = () => {
         </div>
       </div>
 
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Add New Pet</h2>
-            <form className="space-y-4">
-              <input type="text" placeholder="Pet Name" className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-purple-500" />
-              <input type="text" placeholder="Breed" className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-purple-500" />
-              <input type="number" placeholder="Age (years)" className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:border-purple-500" />
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-purple-600 text-black rounded-lg hover:bg-purple-700 font-semibold"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    alert('Pet added successfully!');
-                    closeModal();
-                  }}
-                >
-                  Add Pet
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <PetModal pet={selectedPet} onClose={closePetModal} />
+      <ApplicationModal application={selectedApplication} onClose={closeApplicationModal} />
+      <MessageModal message={selectedMessage} onClose={closeMessageModal} />
+      {showAddPetModal && <AddPetModal onClose={closeAddPetModal} onSubmit={addNewPet} />}
     </div>
   );
 };
