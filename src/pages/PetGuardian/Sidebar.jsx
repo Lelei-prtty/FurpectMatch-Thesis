@@ -9,7 +9,6 @@ const SideBar = ({
   setSidebarOpen,
   navigationItems = [],
 }) => {
-  const navigate = useNavigate();
 
   return (
     <>
@@ -25,7 +24,7 @@ const SideBar = ({
           sidebarOpen ? 'w-64 translate-x-0' : '-translate-x-full w-64 md:w-20 md:translate-x-0'
         }`}
       >
-        <div className="flex min-h-[72px] items-center justify-between border-b border-gray-200 px-3 py-4 sm:px-4 sm:py-6">
+        <div className="flex min-h-18 items-center justify-between border-b border-gray-200 px-3 py-4 sm:px-4 sm:py-6">
           <div className={`flex items-center ${sidebarOpen ? 'gap-3' : 'justify-center w-full'}`}>
             <div className="flex items-center">
               <img

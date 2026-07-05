@@ -1,4 +1,8 @@
+import { useNavigate } from 'react-router-dom'
+
 export default function Hero() {
+  const navigate = useNavigate()
+
   return (
     <section className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-50 px-4 sm:px-6 lg:px-8 py-20">
       <div className="max-w-7xl mx-auto">
@@ -7,7 +11,7 @@ export default function Hero() {
           <div className="space-y-8">
             <div className="inline-flex items-center gap-2 bg-purple-100 text-purple-600 px-4 py-2 rounded-full">
               <span className="text-lg">👥</span>
-              <span className="font-medium">For Adopters & Providers</span>
+              <span className="font-medium">For Pet Guardian & Pet Providers</span>
             </div>
 
             <h1 className="text-5xl md:text-6xl font-bold text-black leading-tight">
@@ -20,12 +24,18 @@ export default function Hero() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <button className="px-8 py-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-lg flex items-center justify-center gap-2">
+              <button
+                className="px-8 py-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-semibold text-lg flex items-center justify-center gap-2"
+                onClick={() => navigate('/guardian/login')}
+              >
                 <span>🐾</span>
                 I Want to Adopt
               </button>
-              <button className="px-8 py-4 border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 font-semibold text-lg">
-                I&apos;m a Provider
+              <button
+                className="px-8 py-4 border-2 border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 font-semibold text-lg"
+                onClick={() => navigate('/provider/login')}
+              >
+                I&apos;m a Pet Provider
               </button>
             </div>
           </div>

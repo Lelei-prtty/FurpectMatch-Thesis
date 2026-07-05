@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Home,
   Heart,
@@ -18,16 +19,18 @@ import {
   Plus,
   Search,
 } from 'lucide-react';
-import SideBar from './SideBar';
-import PetModal from './PetModal';
-import ApplicationModal from './ApplicationModal';
-import MessageModal from './MessageModal';
-import AddPetModal from './AddPetModal';
-import { applications, donations, messagesList, pets } from '../../Data/ProviderSampleData';
+import SideBar from '../PetProvider/SideBar.jsx';
+import Profile from '..PetProvider/ProfileModal.jsx';
+import PetModal from '..PetProvider/PetModal.jsx';
+import ApplicationModal from '../PetProvider/ApplicationModal.jsx';
+import MessageModal from '../PetProvider/MessageModal.jsx';
+import AddPetModal from '../PetProvider/AddPetModal.jsx';
+import { applications, donations, messagesList, pets } from '../../Data/ProviderSampleData.jsx';
 
-const ProviderDashboard = () => {
+const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameOnMount, openApplicationNameOnMount, openMessageNameOnMount }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [petList, setPetList] = useState(pets);
   const [selectedPet, setSelectedPet] = useState(null);
   const [selectedApplication, setSelectedApplication] = useState(null);
@@ -66,7 +69,12 @@ const ProviderDashboard = () => {
   ];
 
   const handleNavClick = (id) => {
-    setActiveTab(id);
+    if (id === 'profile') {
+      setActiveTab('profile');
+      setShowProfileModal(true);
+    } else {
+      setActiveTab(id);
+    }
     if (window.innerWidth < 768) {
       setSidebarOpen(false);
     }
@@ -114,11 +122,13 @@ const ProviderDashboard = () => {
   };
 
   const getActivePageTitle = () => {
+    if (activeTab === 'profile') return 'Profile';
     const currentItem = navigationItems.find((item) => item.id === activeTab);
     return currentItem?.label || 'Dashboard';
   };
 
   const getActivePageSubtitle = () => {
+    if (activeTab === 'profile') return ['Manage your account details and communication preferences.'];
     switch (activeTab) {
       case 'dashboard':
         return ['Overall view of the statistics and insights.'];
@@ -484,6 +494,31 @@ const ProviderDashboard = () => {
     }
   };
 
+  useEffect(() => {
+    if (openProfileOnMount) {
+      setActiveTab('profile');
+      setShowProfileModal(true);
+    }
+  }, [openProfileOnMount]);
+
+  useEffect(() => {
+    if (openAddPetOnMount) {
+      setShowAddPetModal(true);
+    }
+    if (openPetNameOnMount) {
+      const pet = pets.find((p) => p.name === openPetNameOnMount);
+      if (pet) setSelectedPet(pet);
+    }
+    if (openApplicationNameOnMount) {
+      const app = applications.find((a) => a.name === openApplicationNameOnMount);
+      if (app) setSelectedApplication(app);
+    }
+    if (openMessageNameOnMount) {
+      const msg = messagesList.find((m) => m.name === openMessageNameOnMount);
+      if (msg) setSelectedMessage(msg);
+    }
+  }, [openAddPetOnMount, openPetNameOnMount, openApplicationNameOnMount, openMessageNameOnMount]);
+
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       <SideBar
@@ -523,15 +558,6 @@ const ProviderDashboard = () => {
             </span>
               )}
             </button>
-            <div className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 px-3 py-2 rounded-lg transition-colors">
-              <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center">
-                <User className="w-5 h-5 text-black" />
-              </div>
-              <div className="hidden sm:block">
-                <p className="font-semibold text-sm text-gray-900">[User Name]</p>
-                <p className="text-xs text-gray-600">[Organization/Role]</p>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -547,6 +573,7 @@ const ProviderDashboard = () => {
       <ApplicationModal application={selectedApplication} onClose={closeApplicationModal} />
       <MessageModal message={selectedMessage} onClose={closeMessageModal} />
       {showAddPetModal && <AddPetModal onClose={closeAddPetModal} onSubmit={addNewPet} />}
+      <Profile open={showProfileModal} onClose={() => { setShowProfileModal(false); setActiveTab('dashboard'); }} />
     </div>
   );
 };
