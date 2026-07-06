@@ -137,7 +137,7 @@ export default function ProfileModal({ open, onClose }) {
                   </div>
                 </div>
               </div>
-                    <button className="rounded-full bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700">
+                    <button className="rounded-full bg-[#683B0D] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#683B0D]">
                       Edit
                     </button>
                   </div>
@@ -170,7 +170,7 @@ export default function ProfileModal({ open, onClose }) {
                       <p className="text-sm font-semibold text-slate-900">Account Settings</p>
                       <p className="mt-2 text-sm text-slate-600">Manage how you sign in and hear updates.</p>
                     </div>
-                    <button className="rounded-full bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-purple-700">
+                    <button className="rounded-full bg-[#683B0D] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#683B0D]">
                       Edit
                     </button>
                   </div>

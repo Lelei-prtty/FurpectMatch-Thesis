@@ -125,7 +125,7 @@ export default function Profile({ open, onClose }) {
                           <p className="text-xs text-[#989797]">Receive updates about your applications</p>
                         </div>
                         <label className="inline-flex items-center">
-                          <input type="checkbox" checked={adoptionUpdates} onChange={(e) => setAdoptionUpdates(e.target.checked)} className="h-5 w-10 rounded-full accent-purple-600" />
+                          <input type="checkbox" checked={adoptionUpdates} onChange={(e) => setAdoptionUpdates(e.target.checked)} className="h-5 w-10 rounded-full accent-[#683B0D]" />
                         </label>
                       </div>
 
@@ -135,7 +135,7 @@ export default function Profile({ open, onClose }) {
                           <p className="text-xs text-[#989797]">Get notified when new pets match your preferences</p>
                         </div>
                         <label className="inline-flex items-center">
-                          <input type="checkbox" checked={newPetMatches} onChange={(e) => setNewPetMatches(e.target.checked)} className="h-5 w-10 rounded-full accent-purple-600" />
+                          <input type="checkbox" checked={newPetMatches} onChange={(e) => setNewPetMatches(e.target.checked)} className="h-5 w-10 rounded-full accent-[#683B0D]" />
                         </label>
                       </div>
 
@@ -145,7 +145,7 @@ export default function Profile({ open, onClose }) {
                           <p className="text-xs text-[#989797]">Receive helpful tips and pet care resources</p>
                         </div>
                         <label className="inline-flex items-center">
-                          <input type="checkbox" checked={tipsResources} onChange={(e) => setTipsResources(e.target.checked)} className="h-5 w-10 rounded-full accent-purple-600" />
+                          <input type="checkbox" checked={tipsResources} onChange={(e) => setTipsResources(e.target.checked)} className="h-5 w-10 rounded-full accent-[#683B0D]" />
                         </label>
                       </div>
 
@@ -155,7 +155,7 @@ export default function Profile({ open, onClose }) {
                           <p className="text-xs text-[#989797]">Receive news and special offers</p>
                         </div>
                         <label className="inline-flex items-center">
-                          <input type="checkbox" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} className="h-5 w-10 rounded-full accent-purple-600" />
+                          <input type="checkbox" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} className="h-5 w-10 rounded-full accent-[#683B0D]" />
                         </label>
                       </div>
                     </div>
@@ -180,7 +180,7 @@ export default function Profile({ open, onClose }) {
                             <p className="text-xs text-[#989797]">Allow others to see your email</p>
                           </div>
                           <label className="inline-flex items-center">
-                            <input type="checkbox" checked={showEmail} onChange={(e) => setShowEmail(e.target.checked)} className="h-5 w-10 rounded-full accent-purple-600" />
+                            <input type="checkbox" checked={showEmail} onChange={(e) => setShowEmail(e.target.checked)} className="h-5 w-10 rounded-full accent-[#683B0D]" />
                           </label>
                         </div>
 
@@ -190,7 +190,7 @@ export default function Profile({ open, onClose }) {
                             <p className="text-xs text-[#989797]">Allow others to see your phone number</p>
                           </div>
                           <label className="inline-flex items-center">
-                            <input type="checkbox" checked={showPhone} onChange={(e) => setShowPhone(e.target.checked)} className="h-5 w-10 rounded-full accent-purple-600" />
+                            <input type="checkbox" checked={showPhone} onChange={(e) => setShowPhone(e.target.checked)} className="h-5 w-10 rounded-full accent-[#683B0D]" />
                           </label>
                         </div>
 

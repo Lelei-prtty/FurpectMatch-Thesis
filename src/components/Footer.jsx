@@ -1,17 +1,17 @@
 export default function Footer() {
   return (
-    <footer className="bg-gray-900 text-gray-300 px-4 sm:px-6 lg:px-8 py-16">
+    <footer className="bg-[#683B0D] text-white px-4 sm:px-6 lg:px-8 py-16">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
           {/* Brand */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center text-white font-bold">
+              <div className="w-8 h-8 bg-[#683B0D] rounded-lg flex items-center justify-center text-white font-bold">
                 🐾
               </div>
               <span className="text-xl font-bold text-white">PawMatch</span>
             </div>
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-[#989797]">
               Connecting pets with people to create happy, lifelong matches.
             </p>
           </div>
@@ -50,8 +50,8 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-gray-800 pt-8">
-          <p className="text-center text-sm text-gray-500">
+        <div className="border-t border-[#CEA74E] pt-8">
+          <p className="text-center text-sm text-[#CEA74E]">
             &copy; 2024 PawMatch. All rights reserved.
           </p>
         </div>

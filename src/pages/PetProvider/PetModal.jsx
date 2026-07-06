@@ -77,7 +77,7 @@ const PetModal = ({ pet, onClose }) => {
               </button>
               <button
                 type="button"
-                className="flex-1 rounded-full border border-[#CACACA] bg-white px-5 py-3 text-sm font-semibold text-[#683B0D] transition hover:border-purple-500 hover:text-[#683B0D]"
+                className="flex-1 rounded-full border border-[#CACACA] bg-white px-5 py-3 text-sm font-semibold text-[#683B0D] transition hover:border-[#CACACA]/100 hover:text-[#683B0D]"
               >
                 Send update
               </button>

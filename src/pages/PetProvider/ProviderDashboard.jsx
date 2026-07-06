@@ -155,7 +155,7 @@ const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameO
       'Under Review': 'bg-orange-100 text-orange-800',
       'New': 'bg-green-100 text-green-800',
       'Interview': 'bg-blue-100 text-blue-800',
-      'Shortlisted': 'bg-[#683B0D]100 text-purple-800',
+      'Shortlisted': 'bg-[#683B0D]100 text-[#683B0D]800',
     };
     return colors[status] || 'bg-[#CACACA]/20 text-gray-800';
   };
@@ -172,7 +172,7 @@ const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameO
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search pets, applications..."
-              className="w-full bg-white pl-12 pr-4 py-3 rounded-xl border border-[#CACACA] shadow-sm focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100 text-sm sm:text-base"
+              className="w-full bg-white pl-12 pr-4 py-3 rounded-xl border border-[#CACACA] shadow-sm focus:outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20 text-sm sm:text-base"
             />
           </label>
         </div>
@@ -312,7 +312,7 @@ const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameO
                   <button
                     type="button"
                     onClick={() => openApplicationModal(app)}
-                    className="rounded-full border border-[#CACACA] bg-white px-4 py-2 text-sm font-semibold text-[#683B0D] transition hover:border-purple-500 hover:text-[#683B0D]"
+                    className="rounded-full border border-[#CACACA] bg-white px-4 py-2 text-sm font-semibold text-[#683B0D] transition hover:border-[#CACACA]/100 hover:text-[#683B0D]"
                   >
                     View details
                   </button>
@@ -379,7 +379,7 @@ const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameO
             </div>
           ))}
         </div>
-        <div className="h-32 bg-gradient-to-r from-blue-100 to-purple-100 rounded flex items-end justify-between p-4">
+        <div className="h-32 bg-gradient-to-r from-blue-100 to-[#CACACA]/20 rounded flex items-end justify-between p-4">
           {[20, 40, 35, 50, 45, 60, 55].map((height, i) => (
             <div key={i} className="flex-1 bg-blue-500 rounded-t" style={{ height: `${height}%` }}></div>
           ))}
@@ -455,7 +455,7 @@ const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameO
             { title: 'Emergency Rescue Fund', desc: 'Help us rescue animals in critical conditions', raised: '₱8,500', goal: '₱10,000' },
             { title: 'Veterinary Care', desc: 'Provide free medical care to stray animals', raised: '₱5,200', goal: '₱8,000' },
           ].map((cause, i) => (
-            <div key={i} className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6 border border-purple-200">
+            <div key={i} className="bg-gradient-to-r from-[#CACACA]/20 to-blue-50 rounded-lg p-6 border border-[#CEA74E]/30">
               <h3 className="text-lg font-bold text-[#683B0D] mb-2">{cause.title}</h3>
               <p className="text-[#989797] mb-4">{cause.desc}</p>
               <div className="mb-4">

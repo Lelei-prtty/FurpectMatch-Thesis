@@ -8,7 +8,7 @@ export default function HomePage() {
     <>
       <Header />
 
-      <main className="bg-gradient-to-br from-white via-purple-50 to-purple-100 overflow-hidden">
+      <main className="bg-gradient-to-br from-white via-white to-[#CACACA]/20 overflow-hidden">
         <Hero />
         <WhyChoose />
       </main>
