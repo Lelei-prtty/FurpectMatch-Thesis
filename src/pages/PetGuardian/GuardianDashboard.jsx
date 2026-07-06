@@ -1,16 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import { Home, Users, Search, Filter, Heart, MessageSquare } from 'lucide-react'
 import SideBar from '../PetGuardian/Sidebar.jsx'
-import ProfileModal from '../PetGuardian/ProfileModal.jsx'
 import MessageModal from '../PetGuardian/MessageModal.jsx'
-import AdoptionHistoryModal from '../PetGuardian/AdoptionHistoryModal.jsx'
 import { pets, applications, messagesList } from '../../Data/ProviderSampleData.jsx'
 
 export default function GuardianDashboard({ openProfileOnMount, openMessageNameOnMount }) {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [profileModalOpen, setProfileModalOpen] = useState(false)
-  const [adoptionHistoryOpen, setAdoptionHistoryOpen] = useState(false)
   const [selectedMessage, setSelectedMessage] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedSpecies, setSelectedSpecies] = useState('All')
@@ -18,14 +14,7 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
   const [selectedAge, setSelectedAge] = useState('All')
 
   const handleNavClick = (id) => {
-    if (id === 'profile') {
-      setActiveTab('profile')
-      setProfileModalOpen(true)
-    } else if (id === 'adoption') {
-      setAdoptionHistoryOpen(true)
-    } else {
-      setActiveTab(id)
-    }
+    setActiveTab(id)
   }
 
   const getHeaderText = () => {
@@ -33,7 +22,8 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
       'dashboard': { title: 'Browse Pets', desc: 'Find your perfect companion and submit adoption requests in one place.' },
       'applications': { title: 'My Applications', desc: 'Review the adoption applications and next steps.' },
       'messages': { title: 'My Messages', desc: 'View conversations with pet providers.' },
-      'profile': { title: 'My Profile', desc: 'Manage your account details and adoption preferences.' }
+      'profile': { title: 'My Profile', desc: 'Manage your account details and adoption preferences.' },
+      'adoption': { title: 'Adoption History', desc: 'View your pet adoption history and details.' }
     }
     return headers[activeTab] || headers['dashboard']
   }
@@ -49,7 +39,6 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
   useEffect(() => {
     if (openProfileOnMount) {
       setActiveTab('profile')
-      setProfileModalOpen(true)
     }
     if (openMessageNameOnMount) {
       const message = messagesList.find(msg => msg.name === openMessageNameOnMount)
@@ -88,6 +77,25 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
     msg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     msg.message.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  const adoptionHistory = [
+    {
+      petName: 'Coco',
+      breed: 'Rabbit',
+      adoptionDate: 'May 30, 2024',
+      image: 'https://images.unsplash.com/photo-1585110396000-c9ffd4d4b3f4?w=300&h=300&fit=crop',
+      status: 'Currently with us',
+      notes: 'Coco is a sweet and gentle rabbit who loves fresh vegetables and quiet spaces.'
+    },
+    {
+      petName: 'Whiskers',
+      breed: 'Siamese Cat',
+      adoptionDate: 'January 15, 2023',
+      image: 'https://images.unsplash.com/photo-1574158622682-e40e69881006?w=300&h=300&fit=crop',
+      status: 'Previously adopted',
+      notes: 'Whiskers was adopted but later returned. Very affectionate and loves playtime.'
+    }
+  ]
 
   const headerText = getHeaderText()
 
@@ -321,10 +329,53 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
               </div>
             </section>
           )}
+
+          {activeTab === 'adoption' && (
+            <section className="space-y-6">
+              <div className="rounded-3xl bg-white p-6 shadow-sm border border-[#CACACA]">
+                <h2 className="text-xl font-semibold text-[#683B0D]">Adoption History</h2>
+                <p className="mt-2 text-sm text-[#989797]">View your pet adoption history and details.</p>
+              </div>
+              <div className="space-y-6">
+                {adoptionHistory.length > 0 ? (
+                  adoptionHistory.map((adoption, index) => (
+                    <div key={index} className="rounded-4xl border border-[#CACACA] bg-white p-6 shadow-sm hover:shadow-md transition">
+                      <div className="flex flex-col gap-6 md:flex-row md:items-start md:gap-6">
+                        <div className="h-32 w-32 shrink-0 overflow-hidden rounded-3xl bg-[#CACACA]">
+                          <img
+                            src={adoption.image}
+                            alt={adoption.petName}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                            <div>
+                              <p className="text-2xl font-semibold text-[#683B0D]">{adoption.petName}</p>
+                              <p className="mt-1 text-sm text-[#989797]">{adoption.breed}</p>
+                            </div>
+                            <span className="inline-flex rounded-full bg-[#CEA74E] px-3 py-1 text-sm font-semibold text-white w-fit">
+                              {adoption.status}
+                            </span>
+                          </div>
+                          <p className="mt-3 text-sm font-medium text-[#989797]">
+                            Adoption Date: <span className="text-[#683B0D]">{adoption.adoptionDate}</span>
+                          </p>
+                          <p className="mt-4 leading-6 text-[#989797]">{adoption.notes}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-4xl border border-[#CACACA] bg-[#CACACA]/20 p-8 text-center">
+                    <p className="text-[#989797]">No adoption history yet.</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
           </main>
         </div>
-        <ProfileModal open={profileModalOpen} onClose={() => setProfileModalOpen(false)} />
-        <AdoptionHistoryModal open={adoptionHistoryOpen} onClose={() => setAdoptionHistoryOpen(false)} />
         <MessageModal message={selectedMessage} onClose={closeMessageModal} />
       </div>
   )

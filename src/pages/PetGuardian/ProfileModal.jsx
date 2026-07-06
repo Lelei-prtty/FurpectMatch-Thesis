@@ -194,8 +194,5 @@ export default function ProfileModal({ open, onClose }) {
               </div>
             </div>
           </div>
-        </div>
-      </div>
-    </div>
   )
 }
