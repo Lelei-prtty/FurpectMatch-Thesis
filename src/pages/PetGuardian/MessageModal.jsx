@@ -7,12 +7,12 @@ const MessageModal = ({ message, onClose }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-6xl overflow-hidden rounded-[28px] bg-white shadow-2xl ring-1 ring-black/5">
-        <div className="flex flex-col gap-4 border-b border-[#CACACA] px-6 py-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 border-b border-[#CACACA] px-6 py-4 md:flex-row md:items-center md:justify-between bg-[#683B0D]">
           <div className="flex items-center gap-4">
             <img src={message.avatar} alt={message.name} className="h-14 w-14 rounded-3xl object-cover" />
             <div>
-              <h2 className="text-xl font-semibold text-[#683B0D]">{message.name}</h2>
-              <p className="text-sm text-[#989797]">Conversation preview</p>
+              <h2 className="text-xl font-semibold text-white">{message.name}</h2>
+              <p className="text-sm text-[#CEA74E]">Conversation preview</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -23,7 +23,7 @@ const MessageModal = ({ message, onClose }) => {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full p-2 text-[#989797] transition hover:bg-[#CACACA]/20 hover:text-[#683B0D]"
+              className="rounded-full p-2 text-white transition hover:bg-[#CEA74E]/20"
             >
               <X className="h-5 w-5" />
             </button>

@@ -16,73 +16,73 @@ export default function ProviderLogIn() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-purple-100 px-4 py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#CACACA]/20 via-white to-[#CACACA]/20 px-4 py-12 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-4xl overflow-hidden rounded-[32px] bg-white shadow-2xl ring-1 ring-black/5">
         <div className="grid gap-6 lg:grid-cols-[420px_auto]">
           <div className="p-8 sm:p-10">
             <div className="space-y-6">
               <div>
-                <p className="text-sm uppercase tracking-[0.25em] text-purple-600">Provider access</p>
-                <h1 className="mt-4 text-3xl font-semibold text-gray-900">Log in to your Pet Provider account</h1>
-                <p className="mt-3 text-gray-600">Manage pets, review applications, and stay connected with adopters.</p>
+                <p className="text-sm uppercase tracking-[0.25em] text-[#683B0D]">Provider access</p>
+                <h1 className="mt-4 text-3xl font-semibold text-[#683B0D]">Log in to your Pet Provider account</h1>
+                <p className="mt-3 text-[#989797]">Manage pets, review applications, and stay connected with adopters.</p>
               </div>
               <form className="space-y-5" onSubmit={handleSubmit}>
-                <label className="block text-sm font-semibold text-gray-700">
+                <label className="block text-sm font-semibold text-[#683B0D]">
                   Email
                   <input
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     placeholder="provider@pawsafe.org"
-                    className="mt-2 w-full rounded-3xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
+                    className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
                   />
                 </label>
-                <label className="block text-sm font-semibold text-gray-700">
+                <label className="block text-sm font-semibold text-[#683B0D]">
                   Password
                   <input
                     type="password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     placeholder="Enter your password"
-                    className="mt-2 w-full rounded-3xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-100"
+                    className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
                   />
                 </label>
                 <button
                   type="submit"
-                  className="w-full rounded-full bg-purple-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-purple-700"
+                  className="w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#683B0D]"
                 >
                   Log in as Provider
                 </button>
               </form>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-[#989797]">
                 New to PawMatch?{' '}
-                <Link to="/provider/register" className="font-semibold text-purple-600 hover:text-purple-700">
+                <Link to="/provider/register" className="font-semibold text-[#683B0D] hover:text-[#683B0D]">
                   Create a provider account
                 </Link>
               </p>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-[#989797]">
                 Need guardian access?{' '}
-                <Link to="/guardian/login" className="font-semibold text-purple-600 hover:text-purple-700">
+                <Link to="/guardian/login" className="font-semibold text-[#683B0D] hover:text-[#683B0D]">
                   Log in as Guardian
                 </Link>
               </p>
             </div>
           </div>
-          <div className="bg-purple-600 p-8 sm:p-10 text-white">
+          <div className="bg-[#683B0D] p-8 sm:p-10 text-white">
             <div className="space-y-6">
               <div className="rounded-3xl bg-white/10 p-6">
-                <p className="text-xs uppercase tracking-[0.2em] text-purple-100">Provider dashboard</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-[#CACACA]/20">Provider dashboard</p>
                 <p className="mt-4 text-lg font-semibold">Manage pets and applications in one place.</p>
               </div>
               <div className="rounded-3xl bg-white/10 p-6">
-                <p className="text-sm font-semibold text-purple-100">Quick access</p>
-                <p className="mt-3 text-sm leading-6 text-purple-100 opacity-90">
+                <p className="text-sm font-semibold text-[#CACACA]/20">Quick access</p>
+                <p className="mt-3 text-sm leading-6 text-[#CACACA]/20 opacity-90">
                   Add listings, review adoption requests, and respond to messages all from your provider dashboard.
                 </p>
               </div>
               <div className="rounded-3xl bg-white/10 p-6 text-center">
                 <div className="mx-auto mb-5 h-28 w-28 overflow-hidden rounded-full bg-white/20"></div>
-                <p className="text-sm text-purple-100">Trusted by shelters and rescues across the country.</p>
+                <p className="text-sm text-[#CACACA]/20">Trusted by shelters and rescues across the country.</p>
               </div>
             </div>
           </div>

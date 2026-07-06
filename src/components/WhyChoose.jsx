@@ -4,25 +4,25 @@ export default function WhyChoose() {
       icon: '✨',
       title: 'Smart Matching',
       description: 'AI-powered matching to find the perfect pet for you.',
-      bgColor: 'bg-purple-100'
+      bgColor: 'bg-[#CEA74E]/20'
     },
     {
       icon: '🛡️',
       title: 'Verified Providers',
       description: 'All providers are verified to ensure safety and trust.',
-      bgColor: 'bg-green-100'
+      bgColor: 'bg-[#CACACA]/20'
     },
     {
       icon: '❤️',
       title: 'Easy Adoption',
       description: 'Simple steps from discovery to adoption.',
-      bgColor: 'bg-orange-100'
+      bgColor: 'bg-[#CEA74E]/20'
     },
     {
       icon: '💬',
       title: 'Ongoing Support',
       description: 'We&apos;re here to support you every step of the way.',
-      bgColor: 'bg-blue-100'
+      bgColor: 'bg-[#CACACA]/20'
     }
   ]
 
@@ -30,7 +30,7 @@ export default function WhyChoose() {
     <section className="bg-white px-4 sm:px-6 lg:px-8 py-20">
       <div className="max-w-7xl mx-auto">
         <h2 className="text-4xl md:text-5xl font-bold text-center mb-16 text-black">
-          Why Choose PawMatch?
+          Why Choose Furpect Match?
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -40,7 +40,7 @@ export default function WhyChoose() {
                 {feature.icon}
               </div>
               <h3 className="text-xl font-bold text-black">{feature.title}</h3>
-              <p className="text-gray-600 leading-relaxed">{feature.description}</p>
+              <p className="text-[#989797] leading-relaxed">{feature.description}</p>
             </div>
           ))}
         </div>
