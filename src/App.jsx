@@ -29,6 +29,11 @@ export default function App() {
     return <ProviderDashboard openMessageNameOnMount={msgName} />;
   };
 
+  const GuardianWithMessage = () => {
+    const { msgName } = useParams();
+    return <GuardianDashboard openMessageNameOnMount={msgName} />;
+  };
+
   const ProviderWithAddPet = () => <ProviderDashboard openAddPetOnMount />;
 
   return (
@@ -52,6 +57,7 @@ export default function App() {
       <Route path="/provider/application/:appName" element={<ProviderWithApplication />} />
       <Route path="/provider/message/:msgName" element={<ProviderWithMessage />} />
       <Route path="/guardian/profile" element={<GuardianDashboard openProfileOnMount />} />
+      <Route path="/guardian/message/:msgName" element={<GuardianWithMessage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

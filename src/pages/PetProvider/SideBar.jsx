@@ -1,5 +1,6 @@
 import React from 'react';
 import { LogOut, User, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import logo from '../../Assets/logo.svg';
 
 const SideBar = ({

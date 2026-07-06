@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react'
-import { Home, Users, Search, Filter, Heart } from 'lucide-react'
+import { Home, Users, Search, Filter, Heart, MessageSquare } from 'lucide-react'
 import SideBar from '../PetGuardian/Sidebar.jsx'
 import ProfileModal from '../PetGuardian/ProfileModal.jsx'
-import { pets, applications } from '../../Data/ProviderSampleData.jsx'
+import MessageModal from '../PetGuardian/MessageModal.jsx'
+import { pets, applications, messagesList } from '../../Data/ProviderSampleData.jsx'
 
-export default function GuardianDashboard({ openProfileOnMount }) {
+export default function GuardianDashboard({ openProfileOnMount, openMessageNameOnMount }) {
   const [activeTab, setActiveTab] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const [selectedMessage, setSelectedMessage] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedSpecies, setSelectedSpecies] = useState('All')
   const [selectedSize, setSelectedSize] = useState('All')
@@ -20,18 +22,33 @@ export default function GuardianDashboard({ openProfileOnMount }) {
     } else {
       setActiveTab(id)
     }
-  } 
+  }
+
+  const openMessageModal = (message) => {
+    setSelectedMessage(message)
+  }
+
+  const closeMessageModal = () => {
+    setSelectedMessage(null)
+  }
 
   useEffect(() => {
     if (openProfileOnMount) {
       setActiveTab('profile')
       setProfileModalOpen(true)
     }
-  }, [openProfileOnMount])
+    if (openMessageNameOnMount) {
+      const message = messagesList.find(msg => msg.name === openMessageNameOnMount)
+      if (message) {
+        openMessageModal(message)
+      }
+    }
+  }, [openProfileOnMount, openMessageNameOnMount])
 
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'applications', label: 'My Applications', icon: Users },
+    { id: 'messages', label: 'Messages', icon: MessageSquare },
   ]
 
   const speciesOptions = ['All', 'Cat', 'Dog', 'Rabbit']
@@ -51,6 +68,11 @@ export default function GuardianDashboard({ openProfileOnMount }) {
   const filteredApplications = applications.filter((app) =>
     app.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     app.pet.toLowerCase().includes(searchTerm.toLowerCase())
+  )
+
+  const filteredMessages = messagesList.filter((msg) =>
+    msg.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    msg.message.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
   return (
@@ -219,6 +241,42 @@ export default function GuardianDashboard({ openProfileOnMount }) {
             </section>
           )}
 
+          {activeTab === 'messages' && (
+            <section className="space-y-6">
+              <div className="rounded-3xl bg-white p-6 shadow-sm">
+                <h2 className="text-xl font-semibold text-slate-900">My Messages</h2>
+                <p className="mt-2 text-sm text-slate-600">View conversations with pet providers.</p>
+              </div>
+              <div className="space-y-4">
+                {filteredMessages.length > 0 ? (
+                  filteredMessages.map((msg) => (
+                    <button
+                      key={msg.name}
+                      type="button"
+                      onClick={() => openMessageModal(msg)}
+                      className="w-full rounded-3xl bg-white p-4 text-left shadow-sm transition hover:shadow-md"
+                    >
+                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                        <div className="flex items-center gap-4">
+                          <img src={msg.avatar} alt={msg.name} className="h-14 w-14 rounded-full object-cover" />
+                          <div>
+                            <p className="font-semibold text-gray-900">{msg.name}</p>
+                            <p className="text-sm text-gray-600">{msg.message}</p>
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-500">{msg.time}</p>
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <div className="rounded-3xl bg-white p-8 text-center shadow-sm">
+                    <p className="text-gray-700">No messages match your search yet.</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
           {activeTab === 'profile' && (
             <section className="rounded-3xl bg-white p-6 shadow-sm">
               <h2 className="text-xl font-semibold text-slate-900">Guardian Profile</h2>
@@ -246,6 +304,7 @@ export default function GuardianDashboard({ openProfileOnMount }) {
           </main>
         </div>
         <ProfileModal open={profileModalOpen} onClose={() => setProfileModalOpen(false)} />
+        <MessageModal message={selectedMessage} onClose={closeMessageModal} />
       </div>
   )
 }
