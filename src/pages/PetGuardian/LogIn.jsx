@@ -5,6 +5,7 @@ export default function GuardianLogIn() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
 
   const handleSubmit = (event) => {
     event.preventDefault()
@@ -47,6 +48,20 @@ export default function GuardianLogIn() {
                     className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CEA74E]/40"
                   />
                 </label>
+                <div className="flex items-center justify-between gap-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(event) => setRememberMe(event.target.checked)}
+                      className="h-4 w-4 rounded border-[#CACACA] text-[#683B0D] focus:ring-[#CEA74E]"
+                    />
+                    <span className="text-sm text-[#989797]">Remember me</span>
+                  </label>
+                  <Link to="#" className="text-sm font-semibold text-[#683B0D] hover:text-[#CEA74E]">
+                    Forgot password?
+                  </Link>
+                </div>
                 <button
                   type="submit"
                   className="w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"

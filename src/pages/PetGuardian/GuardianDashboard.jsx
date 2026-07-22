@@ -120,13 +120,24 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
             <h1 className="mt-2 text-3xl font-semibold text-[#683B0D]">{headerText.title}</h1>
             <p className="mt-1 text-sm text-[#989797]">{headerText.desc}</p>
           </div>
-          <button
-            type="button"
-            className="relative p-2 hover:bg-[#CACACA]/20 rounded-lg transition-colors"
-            onClick={() => setShowNotifications(true)}
-          >
-            <Bell className="h-5 w-5 text-[#683B0D]" />
-          </button>
+          <div className="flex items-center gap-3">
+            {activeTab === 'profile' && (
+              <button
+                type="button"
+                className="px-4 py-2 rounded-full bg-[#683B0D] text-white text-sm font-semibold transition hover:bg-[#CEA74E]"
+                onClick={() => setShowProfileModal(true)}
+              >
+                Edit Profile
+              </button>
+            )}
+            <button
+              type="button"
+              className="relative p-2 hover:bg-[#CACACA]/20 rounded-lg transition-colors"
+              onClick={() => setShowNotifications(true)}
+            >
+              <Bell className="h-5 w-5 text-[#683B0D]" />
+            </button>
+          </div>
         </div>
 
         <main className="h-[calc(100vh-88px)] overflow-auto px-6 py-6">
