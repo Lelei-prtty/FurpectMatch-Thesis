@@ -11,7 +11,6 @@ import {
   User,
   Settings,
   Bell,
-  MessageCircle,
   ChevronRight,
   ChevronLeft,
   Eye,
@@ -25,6 +24,8 @@ import PetModal from './PetModal.jsx'
 import ApplicationModal from './ApplicationModal.jsx'
 import MessageModal from './MessageModal.jsx'
 import AddPetModal from './AddPetModal.jsx';
+import ProfileSection from '../../components/ProfileSection.jsx';
+import NotificationModal from '../../components/NotificationModal.jsx';
 import { applications, donations, messagesList, pets } from '../../Data/ProviderSampleData';
 
 const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameOnMount, openApplicationNameOnMount, openMessageNameOnMount }) => {
@@ -39,6 +40,7 @@ const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameO
   const [notifications, setNotifications] = useState(2);
   const [messages, setMessages] = useState(3);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const filteredPets = petList.filter((pet) =>
     pet.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -542,19 +544,14 @@ const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameO
             ))}
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            <button className="relative p-2 hover:bg-[#CACACA]/20 rounded-lg transition-colors">
+            <button 
+              className="relative p-2 hover:bg-[#CACACA]/20 rounded-lg transition-colors"
+              onClick={() => setShowNotifications(true)}
+            >
               <Bell className="w-5 h-5 text-[#683B0D]" />
               {notifications > 0 && (
             <span className="absolute top-1 right-1 bg-[#CEA74E] text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
               {notifications}
-            </span>
-              )}
-            </button>
-            <button className="relative p-2 hover:bg-[#CACACA]/20 rounded-lg transition-colors">
-              <MessageCircle className="w-5 h-5 text-[#683B0D]" />
-              {messages > 0 && (
-            <span className="absolute top-1 right-1 bg-[#CEA74E] text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
-              {messages}
             </span>
               )}
             </button>
@@ -574,6 +571,7 @@ const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameO
       <MessageModal message={selectedMessage} onClose={closeMessageModal} />
       {showAddPetModal && <AddPetModal onClose={closeAddPetModal} onSubmit={addNewPet} />}
       <Profile open={showProfileModal} onClose={() => { setShowProfileModal(false); setActiveTab('dashboard'); }} />
+      <NotificationModal open={showNotifications} onClose={() => setShowNotifications(false)} userRole="Provider" />
     </div>
   );
 };
