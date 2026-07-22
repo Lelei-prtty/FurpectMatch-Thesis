@@ -71,12 +71,7 @@ const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameO
   ];
 
   const handleNavClick = (id) => {
-    if (id === 'profile') {
-      setActiveTab('profile');
-      setShowProfileModal(true);
-    } else {
-      setActiveTab(id);
-    }
+    setActiveTab(id);
     if (window.innerWidth < 768) {
       setSidebarOpen(false);
     }
@@ -479,8 +474,16 @@ const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameO
     </div>
   );
 
+  const renderProfile = () => (
+    <div className="space-y-6">
+      <ProfileSection userRole="Provider" onEditClick={() => setShowProfileModal(true)} />
+    </div>
+  );
+
   const renderContent = () => {
     switch (activeTab) {
+      case 'profile':
+        return renderProfile();
       case 'pets':
         return renderPets();
       case 'applications':
