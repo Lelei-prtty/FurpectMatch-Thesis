@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { Home, Users, Search, Filter, Heart, MessageSquare } from 'lucide-react'
+import { Home, Users, Search, Heart, MessageSquare, Bell } from 'lucide-react'
 import SideBar from '../PetGuardian/Sidebar.jsx'
 import MessageModal from '../PetGuardian/MessageModal.jsx'
+import ProfileSection from '../../components/ProfileSection.jsx'
+import NotificationModal from '../../components/NotificationModal.jsx'
 import { pets, applications, messagesList } from '../../Data/ProviderSampleData.jsx'
 
 export default function GuardianDashboard({ openProfileOnMount, openMessageNameOnMount }) {
@@ -12,6 +14,8 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
   const [selectedSpecies, setSelectedSpecies] = useState('All')
   const [selectedSize, setSelectedSize] = useState('All')
   const [selectedAge, setSelectedAge] = useState('All')
+  const [showNotifications, setShowNotifications] = useState(false)
+  const [showProfileModal, setShowProfileModal] = useState(false)
 
   const handleNavClick = (id) => {
     setActiveTab(id)
@@ -116,16 +120,13 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
             <h1 className="mt-2 text-3xl font-semibold text-[#683B0D]">{headerText.title}</h1>
             <p className="mt-1 text-sm text-[#989797]">{headerText.desc}</p>
           </div>
-          {activeTab === 'dashboard' && (
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-[#CACACA] bg-white px-4 py-2 text-sm font-semibold text-[#683B0D] shadow-sm hover:bg-[#CACACA]/20"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-            >
-              <Filter className="h-4 w-4" />
-              Filters
-            </button>
-          )}
+          <button
+            type="button"
+            className="relative p-2 hover:bg-[#CACACA]/20 rounded-lg transition-colors"
+            onClick={() => setShowNotifications(true)}
+          >
+            <Bell className="h-5 w-5 text-[#683B0D]" />
+          </button>
         </div>
 
         <main className="h-[calc(100vh-88px)] overflow-auto px-6 py-6">
@@ -298,36 +299,13 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
           )}
 
           {activeTab === 'profile' && (
-            <section className="rounded-3xl bg-white p-6 shadow-sm border border-[#CACACA]">
-              <h2 className="text-xl font-semibold text-[#683B0D]">Guardian Profile</h2>
-              <p className="mt-2 text-sm text-[#989797]">Manage your account details and adoption preferences.</p>
-              <div className="mt-6 grid gap-6 md:grid-cols-2">
-                <div className="rounded-3xl border border-[#CACACA] p-6 bg-[#CACACA]/10">
-                  <p className="text-sm text-[#989797]">Name</p>
-                  <p className="mt-2 text-lg font-semibold text-[#683B0D]">Maria Santos</p>
-                </div>
-                <div className="rounded-3xl border border-[#CACACA] p-6 bg-[#CACACA]/10">
-                  <p className="text-sm text-[#989797]">Email</p>
-                  <p className="mt-2 text-lg font-semibold text-[#683B0D]">maria@pawmatch.org</p>
-                </div>
-                <div className="rounded-3xl border border-[#CACACA] p-6 bg-[#CACACA]/10">
-                  <p className="text-sm text-[#989797]">Favorite Breed</p>
-                  <p className="mt-2 text-lg font-semibold text-[#683B0D]">Golden Retriever</p>
-                </div>
-                <div className="rounded-3xl border border-[#CACACA] p-6 bg-[#CACACA]/10">
-                  <p className="text-sm text-[#989797]">Member since</p>
-                  <p className="mt-2 text-lg font-semibold text-[#683B0D]">Jan 2025</p>
-                </div>
-              </div>
+            <section className="space-y-6">
+              <ProfileSection userRole="Guardian" onEditClick={() => setShowProfileModal(true)} />
             </section>
           )}
 
           {activeTab === 'adoption' && (
             <section className="space-y-6">
-              <div className="rounded-3xl bg-white p-6 shadow-sm border border-[#CACACA]">
-                <h2 className="text-xl font-semibold text-[#683B0D]">Adoption History</h2>
-                <p className="mt-2 text-sm text-[#989797]">View your pet adoption history and details.</p>
-              </div>
               <div className="space-y-6">
                 {adoptionHistory.length > 0 ? (
                   adoptionHistory.map((adoption, index) => (
@@ -369,6 +347,7 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
           </main>
         </div>
         <MessageModal message={selectedMessage} onClose={closeMessageModal} />
+        <NotificationModal open={showNotifications} onClose={() => setShowNotifications(false)} userRole="Guardian" />
       </div>
   )
 }

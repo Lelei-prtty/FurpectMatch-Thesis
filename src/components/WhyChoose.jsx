@@ -1,25 +1,25 @@
 export default function WhyChoose() {
   const features = [
     {
-      icon: '✨',
+      icon: ' ',
       title: 'Smart Matching',
       description: 'AI-powered matching to find the perfect pet for you.',
       bgColor: 'bg-[#CEA74E]/20'
     },
     {
-      icon: '🛡️',
+      icon: ' ',
       title: 'Verified Providers',
       description: 'All providers are verified to ensure safety and trust.',
       bgColor: 'bg-[#CACACA]/20'
     },
     {
-      icon: '❤️',
+      icon: ' ',
       title: 'Easy Adoption',
       description: 'Simple steps from discovery to adoption.',
       bgColor: 'bg-[#CEA74E]/20'
     },
     {
-      icon: '💬',
+      icon: ' ',
       title: 'Ongoing Support',
       description: 'We&apos;re here to support you every step of the way.',
       bgColor: 'bg-[#CACACA]/20'

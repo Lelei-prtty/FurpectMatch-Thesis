@@ -10,8 +10,7 @@ export default function Hero() {
           {/* Left Side - Content */}
           <div className="space-y-8">
             <div className="inline-flex items-center gap-2 bg-[#CACACA]/20 text-[#683B0D] px-4 py-2 rounded-full">
-              <span className="text-lg">👥</span>
-              <span className="font-medium">For Pet Guardian & Pet Providers</span>
+              <span className="font-medium">For Pet Guardian and Pet Providers</span>
             </div>
 
             <h1 className="text-5xl md:text-6xl font-bold text-black leading-tight">
@@ -28,7 +27,6 @@ export default function Hero() {
                 className="px-8 py-4 bg-[#683B0D] text-white rounded-lg hover:bg-[#CEA74E] font-semibold text-lg flex items-center justify-center gap-2"
                 onClick={() => navigate('/guardian/login')}
               >
-                <span>🐾</span>
                 I Want to Adopt
               </button>
               <button
