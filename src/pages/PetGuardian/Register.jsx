@@ -27,7 +27,6 @@ export default function GuardianRegister() {
         <div className="grid gap-6 lg:grid-cols-[420px_auto]">
           <div className="bg-[#683B0D] p-8 sm:p-10 text-white">
             <div className="flex items-center gap-3 mb-8">
-              <div className="h-12 w-12 rounded-3xl bg-white/20 flex items-center justify-center text-2xl">✓</div>
               <div>
                 <p className="text-sm uppercase tracking-[0.25em] text-[#CEA74E]/60">Join as a Pet Guardian</p>
                 <h1 className="mt-4 text-3xl font-semibold">Create Your Guardian Account</h1>
@@ -55,7 +54,7 @@ export default function GuardianRegister() {
             <div className="space-y-6">
               <div>
                 <p className="text-sm uppercase tracking-[0.25em] text-[#683B0D]">Guardian registration</p>
-                <h1 className="mt-4 text-3xl font-semibold text-[#683B0D]">Sign up for PawMatch</h1>
+                <h1 className="mt-4 text-3xl font-semibold text-[#683B0D]">Sign up for Furpect Match</h1>
               </div>
               <form className="space-y-6" onSubmit={handleSubmit}>
                 <label className="block text-sm font-semibold text-[#683B0D]">
@@ -74,7 +73,7 @@ export default function GuardianRegister() {
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    placeholder="guardian@pawmatch.org"
+                    placeholder="guardian@email.com"
                     className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CEA74E]/40"
                   />
                 </label>

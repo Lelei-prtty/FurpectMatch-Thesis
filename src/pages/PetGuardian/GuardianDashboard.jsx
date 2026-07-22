@@ -117,7 +117,6 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
       <div className="flex-1 overflow-hidden">
         <div className="bg-white border-b border-[#CACACA] px-6 py-5 flex items-center justify-between sticky top-0 z-20">
           <div>
-            <p className="text-sm text-[#989797]">Guardian Dashboard</p>
             <h1 className="mt-2 text-3xl font-semibold text-[#683B0D]">{headerText.title}</h1>
             <p className="mt-1 text-sm text-[#989797]">{headerText.desc}</p>
           </div>

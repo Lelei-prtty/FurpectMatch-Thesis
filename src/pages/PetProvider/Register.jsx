@@ -27,7 +27,6 @@ export default function ProviderRegister() {
         <div className="grid gap-6 lg:grid-cols-[420px_auto]">
           <div className="bg-[#683B0D] p-8 sm:p-10 text-white">
             <div className="flex items-center gap-3 mb-8">
-              <div className="h-12 w-12 rounded-3xl bg-white/20 flex items-center justify-center text-2xl">✓</div>
               <div>
                 <p className="text-sm uppercase tracking-[0.25em] text-[#CEA74E]/30">Join as a Pet Provider</p>
                 <h1 className="mt-4 text-3xl font-semibold">Create Your Provider Account</h1>
@@ -55,7 +54,7 @@ export default function ProviderRegister() {
             <div className="space-y-6">
               <div>
                 <p className="text-sm uppercase tracking-[0.25em] text-[#683B0D]">Provider registration</p>
-                <h1 className="mt-4 text-3xl font-semibold text-[#683B0D]">Sign up for PawMatch</h1>
+                <h1 className="mt-4 text-3xl font-semibold text-[#683B0D]">Sign up for Furpect Match</h1>
               </div>
               <form className="space-y-6" onSubmit={handleSubmit}>
                 <label className="block text-sm font-semibold text-[#683B0D]">
@@ -74,7 +73,7 @@ export default function ProviderRegister() {
                     type="email"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
-                    placeholder="provider@pawsafe.org"
+                    placeholder="provider@email.com"
                     className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
                   />
                 </label>
@@ -107,13 +106,13 @@ export default function ProviderRegister() {
               </form>
               <p className="text-sm text-[#989797]">
                 Already have an account?{' '}
-                <Link to="/provider/login" className="font-semibold text-[#683B0D] hover:text-[#683B0D]">
+                <Link to="/provider/login" className="font-semibold text-[#683B0D]  hover:text-[#CEA74E]">
                   Log in as Provider
                 </Link>
               </p>
               <p className="text-sm text-[#989797]">
                 Looking for guardian access?{' '}
-                <Link to="/guardian/register" className="font-semibold text-[#683B0D] hover:text-[#683B0D]">
+                <Link to="/guardian/register" className="font-semibold text-[#683B0D]  hover:text-[#CEA74E]">
                   Register as Guardian
                 </Link>
               </p>
