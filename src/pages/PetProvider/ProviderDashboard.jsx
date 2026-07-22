@@ -547,15 +547,6 @@ const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameO
             ))}
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
-            {activeTab === 'profile' && (
-              <button
-                type="button"
-                className="px-4 py-2 rounded-full bg-[#683B0D] text-white text-sm font-semibold transition hover:bg-[#CEA74E]"
-                onClick={() => setShowProfileModal(true)}
-              >
-                Edit Profile
-              </button>
-            )}
             <button 
               className="relative p-2 hover:bg-[#CACACA]/20 rounded-lg transition-colors"
               onClick={() => setShowNotifications(true)}
