@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { Home, Users, Search, Heart, MessageSquare, Bell } from 'lucide-react'
 import SideBar from '../PetGuardian/Sidebar.jsx'
 import MessageModal from '../PetGuardian/MessageModal.jsx'
+import ProfileModal from '../PetGuardian/ProfileModal.jsx'
 import ProfileSection from '../../components/ProfileSection.jsx'
 import NotificationModal from '../../components/NotificationModal.jsx'
 import { pets, applications, messagesList } from '../../Data/ProviderSampleData.jsx'
@@ -306,6 +307,10 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
 
           {activeTab === 'adoption' && (
             <section className="space-y-6">
+              <div className="rounded-3xl bg-white p-6 shadow-sm border border-[#CACACA]">
+                <h2 className="text-xl font-semibold text-[#683B0D]">Adoption History</h2>
+                <p className="mt-2 text-sm text-[#989797]">View your pet adoption history and details.</p>
+              </div>
               <div className="space-y-6">
                 {adoptionHistory.length > 0 ? (
                   adoptionHistory.map((adoption, index) => (
@@ -348,6 +353,7 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
         </div>
         <MessageModal message={selectedMessage} onClose={closeMessageModal} />
         <NotificationModal open={showNotifications} onClose={() => setShowNotifications(false)} userRole="Guardian" />
+        <ProfileModal open={showProfileModal} onClose={() => setShowProfileModal(false)} />
       </div>
   )
 }

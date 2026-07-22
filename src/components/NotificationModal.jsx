@@ -4,7 +4,7 @@ import { X, MessageSquare, Users, Gift, AlertCircle } from 'lucide-react'
 export default function NotificationModal({ open, onClose, userRole = 'Guardian' }) {
   const [selectedTab, setSelectedTab] = useState('all')
 
-  // Sample notification data
+  // Sample notification data only
   const guardianNotifications = [
     {
       id: 1,
