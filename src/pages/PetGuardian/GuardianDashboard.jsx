@@ -306,10 +306,6 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
 
           {activeTab === 'adoption' && (
             <section className="space-y-6">
-              <div className="rounded-3xl bg-white p-6 shadow-sm border border-[#CACACA]">
-                <h2 className="text-xl font-semibold text-[#683B0D]">Adoption History</h2>
-                <p className="mt-2 text-sm text-[#989797]">View your pet adoption history and details.</p>
-              </div>
               <div className="space-y-6">
                 {adoptionHistory.length > 0 ? (
                   adoptionHistory.map((adoption, index) => (
