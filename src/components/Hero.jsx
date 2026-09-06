@@ -19,7 +19,8 @@ export default function Hero() {
             </h1>
 
             <p className="text-lg text-[#989797] leading-relaxed">
-              PawMatch is the all-in-one adoption platform that brings adopters and providers together to create happy, lifelong matches.
+              Furpect Match is a adoption recommendation system that helps pets find their furpect match with new loving homes. 
+              We connect pet guardians and pet providers to ensure that every pet finds a loving family.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 pt-4">

@@ -1,11 +1,16 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import guardianLoginImage from '../../Assets/icons/guardian-icon.svg'
 
 export default function GuardianLogIn() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
+
+  const [showForgotPassword, setShowForgotPassword] = useState(false)
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetSent, setResetSent] = useState(false)
 
   const handleSubmit = (event) => {
     event.preventDefault()
@@ -14,6 +19,22 @@ export default function GuardianLogIn() {
       return
     }
     navigate('/guardian/dashboard', { replace: true })
+  }
+
+  const handleForgotPasswordSubmit = (event) => {
+    event.preventDefault()
+    if (!resetEmail) {
+      alert('Please enter your email.')
+      return
+    }
+    // TODO: hook this up to your real password-reset API call
+    setResetSent(true)
+  }
+
+  const closeForgotPasswordModal = () => {
+    setShowForgotPassword(false)
+    setResetEmail('')
+    setResetSent(false)
   }
 
   return (
@@ -58,9 +79,13 @@ export default function GuardianLogIn() {
                     />
                     <span className="text-sm text-[#989797]">Remember me</span>
                   </label>
-                  <Link to="#" className="text-sm font-semibold text-[#683B0D] hover:text-[#CEA74E]">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-sm font-semibold text-[#683B0D] hover:text-[#CEA74E]"
+                  >
                     Forgot password?
-                  </Link>
+                  </button>
                 </div>
                 <button
                   type="submit"
@@ -95,14 +120,91 @@ export default function GuardianLogIn() {
                   Save favorites, send applications, and track pet updates in one place.
                 </p>
               </div>
-              <div className="rounded-3xl bg-white/10 p-6 text-center">
-                <div className="mx-auto mb-5 h-28 w-28 overflow-hidden rounded-full bg-white/20"></div>
+              <div className="rounded-3xl bg-white/10 p-6 justify-items-center">
+                <img src={guardianLoginImage} alt="Guardian Login" className="w-45 h-45 justify-items-center" />
                 <p className="text-sm text-[#CEA74E]/40">Make your next adoption the best match.</p>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+
+      {/* Forgot Password pop up Modal */}
+      {showForgotPassword && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={closeForgotPasswordModal}
+        >
+          <div
+            className="w-full max-w-md rounded-[28px] bg-white p-8 shadow-2xl ring-1 ring-black/5"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {!resetSent ? (
+              <>
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-sm uppercase tracking-[0.25em] text-[#683B0D]">Guardian access</p>
+                    <h2 className="mt-3 text-2xl font-semibold text-[#683B0D]">Reset your password</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeForgotPasswordModal}
+                    className="text-[#989797] hover:text-[#683B0D] text-xl leading-none"
+                    aria-label="Close"
+                  >
+                    ×
+                  </button>
+                </div>
+                <p className="mt-3 text-sm text-[#989797]">
+                  Enter the email linked to your account and we'll send you a link to reset your password.
+                </p>
+                <form className="mt-6 space-y-5" onSubmit={handleForgotPasswordSubmit}>
+                  <label className="block text-sm font-semibold text-[#683B0D]">
+                    Email
+                    <input
+                      type="email"
+                      value={resetEmail}
+                      onChange={(event) => setResetEmail(event.target.value)}
+                      placeholder="guardian@pawmatch.org"
+                      className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CEA74E]/40"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    className="w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
+                  >
+                    Send reset link
+                  </button>
+                </form>
+                <button
+                  type="button"
+                  onClick={closeForgotPasswordModal}
+                  className="mt-4 w-full text-center text-sm font-semibold text-[#683B0D] hover:text-[#CEA74E]"
+                >
+                  Back to log in
+                </button>
+              </>
+            ) : (
+              <div className="text-center">
+                <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#CEA74E]/20">
+                  <span className="text-2xl">✓</span>
+                </div>
+                <h2 className="text-2xl font-semibold text-[#683B0D]">Check your email</h2>
+                <p className="mt-3 text-sm text-[#989797]">
+                  We've sent a password reset link to <span className="font-semibold text-[#683B0D]">{resetEmail}</span>.
+                </p>
+                <button
+                  type="button"
+                  onClick={closeForgotPasswordModal}
+                  className="mt-6 w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
+                >
+                  Done
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div> 
   )
 }

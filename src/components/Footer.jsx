@@ -7,14 +7,14 @@ export default function Footer() {
             <div className="flex items-center gap-2 mb-4">
               <span className="text-xl font-bold text-white">Furpect Match</span>
             </div>
-            <p className="text-sm text-[#989797]">
-              Connecting pets with people to create happy, lifelong matches.
+            <p className="text-sm  text-white">
+              Connecting pets with pet guardians to provide new loving homes.
             </p>
           </div>
 
           {/* For Guardian*/}
           <div>
-            <h4 className="font-semibold text-white mb-4">For Adopters</h4>
+            <h4 className="font-semibold text-white mb-4">For Pet Guardians</h4>
             <ul className="space-y-2 text-sm">
               <li><a href="#" className="hover:text-white transition">Browse Pets</a></li>
               <li><a href="#" className="hover:text-white transition">How It Works</a></li>
@@ -25,10 +25,9 @@ export default function Footer() {
 
           {/* For Providers */}
           <div>
-            <h4 className="font-semibold text-white mb-4">For Providers</h4>
+            <h4 className="font-semibold text-white mb-4">For Pet Providers</h4>
             <ul className="space-y-2 text-sm">
               <li><a href="#" className="hover:text-white transition">Register</a></li>
-              <li><a href="#" className="hover:text-white transition">Partner Program</a></li>
               <li><a href="#" className="hover:text-white transition">Resources</a></li>
               <li><a href="#" className="hover:text-white transition">Contact</a></li>
             </ul>
