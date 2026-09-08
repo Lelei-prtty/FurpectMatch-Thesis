@@ -3,6 +3,7 @@ import { Home, Users, Search, Heart, MessageSquare, Bell } from 'lucide-react'
 import SideBar from '../PetGuardian/Sidebar.jsx'
 import MessageModal from '../PetGuardian/MessageModal.jsx'
 import ProfileModal from '../PetGuardian/ProfileModal.jsx'
+import PetDetailModal from '../PetGuardian/PetDetailModal.jsx'
 import ProfileSection from '../../components/ProfileSection.jsx'
 import NotificationModal from '../../components/NotificationModal.jsx'
 import { pets, applications, messagesList } from '../../Data/ProviderSampleData.jsx'
@@ -17,6 +18,8 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
   const [selectedAge, setSelectedAge] = useState('All')
   const [showNotifications, setShowNotifications] = useState(false)
   const [showProfileModal, setShowProfileModal] = useState(false)
+  const [likedPetIds, setLikedPetIds] = useState([])
+  const [selectedPet, setSelectedPet] = useState(null)
 
   const handleNavClick = (id) => {
     setActiveTab(id)
@@ -39,6 +42,20 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
 
   const closeMessageModal = () => {
     setSelectedMessage(null)
+  }
+
+  const openPetDetail = (pet) => {
+    setSelectedPet(pet)
+  }
+
+  const closePetDetail = () => {
+    setSelectedPet(null)
+  }
+
+  const toggleLikePet = (pet) => {
+    setLikedPetIds((prev) =>
+      prev.includes(pet.id) ? prev.filter((id) => id !== pet.id) : [...prev, pet.id]
+    )
   }
 
   useEffect(() => {
@@ -67,9 +84,13 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
     const searchMatch = [pet.name, pet.breed].some((field) =>
       field.toLowerCase().includes(searchTerm.toLowerCase())
     )
-    const speciesMatch = selectedSpecies === 'All' || pet.breed.toLowerCase().includes(selectedSpecies.toLowerCase())
-    const sizeMatch = selectedSize === 'All' || (selectedSize === 'Small' ? pet.age.includes('yr') : true)
-    const ageMatch = selectedAge === 'All' || (selectedAge === 'Puppy/Kitten' ? pet.age.includes('mo') : true)
+    const speciesMatch = selectedSpecies === 'All' || pet.species === selectedSpecies
+    const sizeMatch = selectedSize === 'All' || pet.size === selectedSize
+    const ageMatch =
+      selectedAge === 'All' ||
+      (selectedAge === 'Puppy/Kitten' && pet.age.includes('mo')) ||
+      (selectedAge === 'Young' && pet.age.includes('1 year')) ||
+      (selectedAge === 'Adult' && !pet.age.includes('mo') && !pet.age.includes('1 year'))
     return searchMatch && speciesMatch && sizeMatch && ageMatch
   })
 
@@ -192,7 +213,7 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
                 </div>
                 <div className="rounded-3xl bg-white p-6 shadow-sm border border-[#CACACA]">
                   <p className="text-sm font-semibold text-[#989797]">Favorites</p>
-                  <p className="mt-4 text-3xl font-bold text-[#683B0D]">24</p>
+                  <p className="mt-4 text-3xl font-bold text-[#683B0D]">{likedPetIds.length}</p>
                   <p className="mt-2 text-sm text-[#989797]">Keep track of pets you love.</p>
                 </div>
                 <div className="rounded-3xl bg-white p-6 shadow-sm border border-[#CACACA]">
@@ -203,29 +224,56 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
               </div>
 
               <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                {filteredPets.map((pet) => (
-                  <div key={pet.name} className="overflow-hidden rounded-[32px] bg-white shadow-sm border border-[#CACACA] hover:shadow-md transition">
-                    <div className="h-48 overflow-hidden bg-[#CACACA]">
-                      <img src={pet.image} alt={pet.name} className="h-full w-full object-cover" />
-                    </div>
-                    <div className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-[#989797]">{pet.breed}</p>
-                          <h2 className="mt-2 text-2xl font-bold text-[#683B0D]">{pet.name}</h2>
-                        </div>
-                        <button className="rounded-full border border-[#CACACA] bg-white p-2 text-[#683B0D] hover:bg-[#CEA74E] hover:text-white transition">
-                          <Heart className="h-4 w-4" />
+                {filteredPets.map((pet) => {
+                  const isLiked = likedPetIds.includes(pet.id)
+                  return (
+                    <div
+                      key={pet.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openPetDetail(pet)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') openPetDetail(pet)
+                      }}
+                      className="cursor-pointer overflow-hidden rounded-[32px] bg-white shadow-sm border border-[#CACACA] transition hover:-translate-y-1 hover:shadow-lg"
+                    >
+                      <div className="relative h-48 overflow-hidden bg-[#CACACA]">
+                        <img src={pet.image} alt={pet.name} className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            toggleLikePet(pet)
+                          }}
+                          className={`group absolute right-3 top-3 rounded-full p-2 shadow-sm transition ${
+                            isLiked ? 'bg-[#CEA74E] text-white' : 'bg-white/90 text-[#683B0D] hover:bg-[#CEA74E] hover:text-white'
+                          }`}
+                          aria-label={isLiked ? 'Remove from favorites' : 'Add to favorites'}
+                        >
+                          <Heart className={`h-4 w-4 transition group-hover:scale-110 ${isLiked ? 'fill-current' : ''}`} />
                         </button>
                       </div>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.age}</span>
-                        <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.status}</span>
-                        <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.health}</span>
+                      <div className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-[#989797]">{pet.breed}</p>
+                            <h2 className="mt-2 text-2xl font-bold text-[#683B0D]">{pet.name}</h2>
+                          </div>
+                        </div>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.species}</span>
+                          <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.gender}</span>
+                          <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.size}</span>
+                          <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.age}</span>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <span className="rounded-full bg-[#683B0D]/10 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.status}</span>
+                          <span className="rounded-full bg-[#683B0D]/10 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.health}</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </section>
           )}
@@ -349,6 +397,13 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
         <MessageModal message={selectedMessage} onClose={closeMessageModal} />
         <NotificationModal open={showNotifications} onClose={() => setShowNotifications(false)} userRole="Guardian" />
         <ProfileModal open={showProfileModal} onClose={() => setShowProfileModal(false)} />
+        <PetDetailModal
+          pet={selectedPet}
+          open={!!selectedPet}
+          onClose={closePetDetail}
+          isLiked={selectedPet ? likedPetIds.includes(selectedPet.id) : false}
+          onToggleLike={toggleLikePet}
+        />
       </div>
   )
 }
