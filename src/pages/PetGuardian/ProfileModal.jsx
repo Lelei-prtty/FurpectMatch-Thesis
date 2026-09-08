@@ -1,10 +1,47 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import PetPreferencesForm from '../../components/Petpreferencesform.jsx'
+import PetPreferencesSummary from '../../Data/Petpreferencessummary.jsx'
+import { DEFAULT_PET_PREFERENCES } from '../../Data/Petpreferencesoptions.jsx'
+import { getPetPreferences, hasPetPreferences, savePetPreferences } from '../../Data/Petpreferencesstorage.jsx'
 
 export default function ProfileModal({ open, onClose }) {
   const [activeTab, setActiveTab] = useState('Personal Information')
+  const [petPreferences, setPetPreferences] = useState(DEFAULT_PET_PREFERENCES)
+  const [draftPetPreferences, setDraftPetPreferences] = useState(DEFAULT_PET_PREFERENCES)
+  const [isEditingPetPreferences, setIsEditingPetPreferences] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    const stored = getPetPreferences()
+    if (stored) {
+      setPetPreferences(stored)
+      setDraftPetPreferences(stored)
+    }
+  }, [open])
+
   if (!open) return null
 
-  const tabs = ['Personal Information', 'Preferences']
+  const tabs = ['Personal Information', 'Preferences & Lifestyle']
+
+  const handlePetPreferenceFieldChange = (field, value) => {
+    setDraftPetPreferences((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const startEditingPetPreferences = () => {
+    setDraftPetPreferences(petPreferences)
+    setIsEditingPetPreferences(true)
+  }
+
+  const cancelEditingPetPreferences = () => {
+    setDraftPetPreferences(petPreferences)
+    setIsEditingPetPreferences(false)
+  }
+
+  const savePetPreferencesEdits = () => {
+    setPetPreferences(draftPetPreferences)
+    savePetPreferences(draftPetPreferences)
+    setIsEditingPetPreferences(false)
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 sm:px-6">
@@ -136,13 +173,8 @@ export default function ProfileModal({ open, onClose }) {
                   </div>
                 </div>
               </div>
-            </div>
-          )}
-
-          {activeTab === 'Preferences' && (
-            <div className="space-y-6">
-              <div className="rounded-4xl border border-[#CACACA] bg-white p-6 shadow-sm">
-                <h3 className="text-lg font-semibold text-[#683B0D] mb-6">Email Notifications</h3>
+               <div className="rounded-4xl border border-[#CACACA] bg-white p-6 shadow-sm">
+                <h3 className="mb-6 text-lg font-semibold text-[#683B0D]">Email Notifications</h3>
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div>
@@ -176,11 +208,11 @@ export default function ProfileModal({ open, onClose }) {
               </div>
 
               <div className="rounded-4xl border border-[#CACACA] bg-white p-6 shadow-sm">
-                <h3 className="text-lg font-semibold text-[#683B0D] mb-6">Privacy Settings</h3>
+                <h3 className="mb-6 text-lg font-semibold text-[#683B0D]">Privacy Settings</h3>
                 <div className="space-y-4">
                   <div>
                     <label className="block">
-                      <p className="text-sm font-semibold text-[#683B0D] mb-2">Profile Visibility</p>
+                      <p className="mb-2 text-sm font-semibold text-[#683B0D]">Profile Visibility</p>
                       <select className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CEA74E]/40">
                         <option>Everyone</option>
                         <option>Only Connected Users</option>
@@ -214,6 +246,63 @@ export default function ProfileModal({ open, onClose }) {
                 </button>
               </div>
             </div>
+              
+          )}
+
+          {activeTab === 'Preferences & Lifestyle' && (
+            <div className="space-y-6">
+              {/* Pet adoption preferences & lifestyle, collected at registration */}
+              <div className="rounded-4xl border border-[#CACACA] bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-[#683B0D]">Pet Adoption Preferences & Lifestyle</h3>
+                    <p className="mt-2 text-sm text-[#989797]">
+                      These answers help providers match you with the right pet.
+                    </p>
+                  </div>
+                  {!isEditingPetPreferences && (
+                    <button
+                      type="button"
+                      onClick={startEditingPetPreferences}
+                      className="rounded-full bg-[#683B0D] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
+                    >
+                      {hasPetPreferences() ? 'Edit' : 'Add Preferences'}
+                    </button>
+                  )}
+                </div>
+
+                <div className="mt-6">
+                  {isEditingPetPreferences ? (
+                    <div className="space-y-6">
+                      <PetPreferencesForm values={draftPetPreferences} onFieldChange={handlePetPreferenceFieldChange} />
+                      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                        <button
+                          type="button"
+                          onClick={cancelEditingPetPreferences}
+                          className="rounded-full border border-[#CACACA] bg-white px-6 py-3 text-sm font-semibold text-[#683B0D] transition hover:bg-[#CACACA]/10"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={savePetPreferencesEdits}
+                          className="rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
+                        >
+                          Save Preferences
+                        </button>
+                      </div>
+                    </div>
+                  ) : hasPetPreferences() ? (
+                    <PetPreferencesSummary values={petPreferences} />
+                  ) : (
+                    <p className="text-sm text-[#989797]">
+                      You haven&apos;t completed your adoption preferences yet. Add them so providers can match you with the right pet.
+                    </p>
+                  )}
+                </div>
+              </div>
+              </div>
+
           )}
         </div>
       </div>

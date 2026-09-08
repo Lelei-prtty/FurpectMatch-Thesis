@@ -4,7 +4,7 @@ import { Edit } from 'lucide-react'
 export default function ProfileSection({ userRole = 'Guardian', onEditClick }) {
   const [userInfo] = useState({
     name: userRole === 'Guardian' ? 'Maria Santos' : 'Juan Dela Cruz',
-    email: userRole === 'Guardian' ? 'maria@pawmatch.org' : 'juan.delacruz@providers.org',
+    email: userRole === 'Guardian' ? 'maria@pfurmatch.org' : 'juan.delacruz@providers.org',
     phone: userRole === 'Guardian' ? '+1 (555) 123-4567' : '+1 (555) 987-6543',
     avatar: userRole === 'Guardian' 
       ? 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=128&h=128&fit=crop'
