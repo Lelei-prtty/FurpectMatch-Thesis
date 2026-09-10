@@ -62,8 +62,11 @@ export default function ProviderRegister() {
       alert('Please fill in the pet\'s name, breed, and age before continuing.')
       return
     }
-    // TODO: hook this up to your real "create pet listing" API call
-    navigate('/provider/dashboard', { replace: true })
+
+    navigate('/provider/dashboard', {
+      replace: true,
+      state: { petInfo },
+    })
   }
 
   return (

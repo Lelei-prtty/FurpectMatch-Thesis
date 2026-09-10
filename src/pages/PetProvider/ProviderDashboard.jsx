@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   Home,
   Heart,
@@ -29,6 +29,7 @@ import NotificationModal from '../../components/NotificationModal.jsx';
 import { applications, donations, messagesList, pets } from '../../Data/ProviderSampleData';
 
 const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameOnMount, openApplicationNameOnMount, openMessageNameOnMount }) => {
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -507,7 +508,7 @@ const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameO
   }, [openProfileOnMount]);
 
   useEffect(() => {
-    if (openAddPetOnMount) {
+    if (openAddPetOnMount || location.state?.petInfo) {
       setShowAddPetModal(true);
     }
     if (openPetNameOnMount) {
@@ -572,7 +573,13 @@ const ProviderDashboard = ({ openProfileOnMount, openAddPetOnMount, openPetNameO
       <PetModal pet={selectedPet} onClose={closePetModal} />
       <ApplicationModal application={selectedApplication} onClose={closeApplicationModal} />
       <MessageModal message={selectedMessage} onClose={closeMessageModal} />
-      {showAddPetModal && <AddPetModal onClose={closeAddPetModal} onSubmit={addNewPet} />}
+      {showAddPetModal && (
+        <AddPetModal
+          onClose={closeAddPetModal}
+          onSubmit={addNewPet}
+          initialPet={location.state?.petInfo || null}
+        />
+      )}
       <Profile open={showProfileModal} onClose={() => { setShowProfileModal(false); setActiveTab('dashboard'); }} />
       <NotificationModal open={showNotifications} onClose={() => setShowNotifications(false)} userRole="Provider" />
     </div>

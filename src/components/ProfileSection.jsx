@@ -15,6 +15,19 @@ export default function ProfileSection({ userRole = 'Guardian', onEditClick }) {
 
   return (
     <div className="rounded-3xl bg-white p-6 shadow-sm border border-[#CACACA]">
+     {/* Edit profile button */}
+      <div className="absolute bottom-4 right-4">
+    <button
+      type="button"
+      onClick={onEditClick}
+      className="inline-flex items-center gap-2 rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
+    >
+      <Edit className="h-4 w-4" />
+      Edit Profile
+    </button>
+  </div>
+
+
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
         {/* Left: Avatar and Basic Info */}
         <div className="flex flex-col items-center gap-4 lg:items-start">
@@ -29,14 +42,6 @@ export default function ProfileSection({ userRole = 'Guardian', onEditClick }) {
             <h2 className="text-2xl font-bold text-[#683B0D]">{userInfo.name}</h2>
             <p className="mt-1 text-sm text-[#989797]">{userInfo.role}</p>
           </div>
-          <button
-            type="button"
-            onClick={onEditClick}
-            className="inline-flex items-center gap-2 rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
-          >
-            <Edit className="h-4 w-4" />
-            Edit Profile
-          </button>
         </div>
 
         {/* Right: Details Grid */}
