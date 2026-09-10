@@ -34,6 +34,23 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {} }) => {
     }));
   };
 
+  const handleImageUpload = (event) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please upload a valid image file.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateField('image', reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = (event) => {
     event.preventDefault();
 
@@ -73,55 +90,67 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {} }) => {
           </button>
         </div>
 
-        <form className="space-y-6 p-6" onSubmit={handleSubmit}>
-          <div className="grid gap-6 sm:grid-cols-2">
-            <label className="space-y-2 text-sm font-semibold text-[#683B0D]">
-              Image URL
-              <input
-                type="text"
-                value={pet.image}
-                onChange={(event) => updateField('image', event.target.value)}
-                placeholder="https://example.com/image.jpg"
-                className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
-              />
-            </label>
-            <label className="space-y-2 text-sm font-semibold text-[#683B0D]">
-              Pet name
-              <input
-                type="text"
-                value={pet.name}
-                onChange={(event) => updateField('name', event.target.value)}
-                placeholder="Enter pet name"
-                className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
-              />
-            </label>
-          </div>
+        <form className="space-y-4 p-6 pt-4" onSubmit={handleSubmit}>
+          <div className="grid gap-6 sm:grid-cols-[1.1fr_1fr] items-start">
+            <div className="space-y-2 text-sm font-semibold text-[#683B0D]">
+              Pet image
+              <div className="overflow-hidden rounded-3xl border border-[#CACACA] bg-[#CACACA]/10 p-3">
+                {pet.image && (
+                  <div className="mb-3 overflow-hidden rounded-2xl border border-[#CACACA] bg-[#CACACA]/10">
+                    <img
+                      src={pet.image}
+                      alt="Pet preview"
+                      className="h-40 w-full object-cover"
+                    />
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  className="block w-full text-sm text-[#683B0D] file:mr-4 file:rounded-full file:border-0 file:bg-[#683B0D] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#CEA74E]"
+                />
+              </div>
+            </div>
 
-          <div className="grid gap-6 sm:grid-cols-2">
-            <label className="space-y-2 text-sm font-semibold text-[#683B0D]">
-              Type of Pet
-              <select
-                value={pet.species}
-                onChange={(event) => updateField('species', event.target.value)}
-                className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
-              >
-                <option>Dog</option>
-                <option>Cat</option>
-                <option>Rabbit</option>
-                <option>Bird</option>
-                <option>Other</option>
-              </select>
-            </label>
-            <label className="space-y-2 text-sm font-semibold text-[#683B0D]">
-              Breed
-              <input
-                type="text"
-                value={pet.breed}
-                onChange={(event) => updateField('breed', event.target.value)}
-                placeholder="Enter breed"
-                className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
-              />
-            </label>
+            <div className="space-y-4">
+              <label className="space-y-2 text-sm font-semibold text-[#683B0D]">
+                Pet name
+                <input
+                  type="text"
+                  value={pet.name}
+                  onChange={(event) => updateField('name', event.target.value)}
+                  placeholder="Enter pet name"
+                  className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
+                />
+              </label>
+
+              <label className="space-y-2 text-sm font-semibold text-[#683B0D]">
+                Type of Pet
+                <select
+                  value={pet.species}
+                  onChange={(event) => updateField('species', event.target.value)}
+                  className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
+                >
+                  <option>Dog</option>
+                  <option>Cat</option>
+                  <option>Rabbit</option>
+                  <option>Bird</option>
+                  <option>Other</option>
+                </select>
+              </label>
+
+              <label className="space-y-2 text-sm font-semibold text-[#683B0D]">
+                Breed
+                <input
+                  type="text"
+                  value={pet.breed}
+                  onChange={(event) => updateField('breed', event.target.value)}
+                  placeholder="Enter breed"
+                  className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
+                />
+              </label>
+            </div>
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2">
