@@ -1,6 +1,18 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import guardianLoginImage from '../../Assets/icons/guardian-icon.svg'
+import { setGuardianId, getGuardianId } from '../../Data/GuardianSession.jsx'
+import { authenticate, getCurrentUser, startSession, validateEmail } from '../../Data/Accounts.jsx'
+
+const inputClass = (hasError, extra = '') =>
+  `mt-2 w-full rounded-3xl border bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:ring-2 ${extra} ${
+    hasError
+      ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+      : 'border-[#CACACA] focus:border-[#CEA74E] focus:ring-[#CEA74E]/40'
+  }`
+
+// Dataset ids look like G001. Only the demo recommender link uses this.
+const GUARDIAN_ID_PATTERN = /^G\d{3,4}$/
 
 export default function GuardianLogIn() {
   const navigate = useNavigate()
@@ -8,35 +20,66 @@ export default function GuardianLogIn() {
   const [password, setPassword] = useState('')
   const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  // DEMO ONLY: there's no real auth/backend yet, so we let the tester pick
+  // which guardian_id from the survey dataset (e.g. "G001") to view
+  // recommendations as. Remove this once real login issues a guardian_id.
+  const [guardianId, setGuardianIdInput] = useState(getGuardianId())
 
   const [showForgotPassword, setShowForgotPassword] = useState(false)
-  const [resetEmail, setResetEmail] = useState('')
-  const [resetSent, setResetSent] = useState(false)
 
-  const handleSubmit = (event) => {
+  const location = useLocation()
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [formError, setFormError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  // Already signed in? Skip the form.
+  useEffect(() => {
+    if (getCurrentUser()) navigate('/guardian/dashboard', { replace: true })
+  }, [navigate])
+
+  const clearErrors = (field) => {
+    setFieldErrors((prev) => ({ ...prev, [field]: undefined }))
+    if (formError) setFormError('')
+  }
+
+  const handleSubmit = async (event) => {
     event.preventDefault()
-    if (!email || !password) {
-      alert('Please enter your email and password.')
+    const normalizedGuardianId = guardianId.trim().toUpperCase() || 'G001'
+    const nextErrors = {
+      email: validateEmail(email),
+      password: password ? '' : 'Please enter your password.',
+      guardianId: GUARDIAN_ID_PATTERN.test(normalizedGuardianId) ? '' : 'Use the format G001.',
+    }
+    setFieldErrors(nextErrors)
+    setFormError('')
+    const firstInvalid = ['email', 'password', 'guardianId'].find((field) => nextErrors[field])
+    if (firstInvalid) {
+      document.getElementById(`login-${firstInvalid}`)?.focus()
       return
     }
-    navigate('/guardian/dashboard', { replace: true })
-  }
 
-  const handleForgotPasswordSubmit = (event) => {
-    event.preventDefault()
-    if (!resetEmail) {
-      alert('Please enter your email.')
+    setSubmitting(true)
+    const result = await authenticate(email, password)
+    setSubmitting(false)
+
+    if (!result.ok) {
+      if (result.reason === 'locked') {
+        setFormError(`Too many failed attempts. Please wait ${result.retryAfterSeconds} seconds and try again.`)
+      } else if (result.reason === 'crypto') {
+        setFormError(result.message)
+      } else {
+        // Same message whether the email or the password was wrong, on purpose.
+        setFormError('Incorrect email or password.')
+      }
       return
     }
-    // TODO: hook this up to your real password-reset API call
-    setResetSent(true)
+
+    startSession(result.user, rememberMe)
+    setGuardianId(normalizedGuardianId)
+    navigate(location.state?.from || '/guardian/dashboard', { replace: true })
   }
 
-  const closeForgotPasswordModal = () => {
-    setShowForgotPassword(false)
-    setResetEmail('')
-    setResetSent(false)
-  }
+  const closeForgotPasswordModal = () => setShowForgotPassword(false)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#CACACA]/20 via-white to-[#CACACA]/20 px-4 py-12 sm:px-6 lg:px-8">
@@ -49,27 +92,63 @@ export default function GuardianLogIn() {
                 <h1 className="mt-4 text-3xl font-semibold text-[#683B0D]">Log in to your Pet Guardian account</h1>
                 <p className="mt-3 text-[#989797]">Find pets, save favorites, and submit adoption requests with ease.</p>
               </div>
-              <form className="space-y-5" onSubmit={handleSubmit}>
-                <label className="block text-sm font-semibold text-[#683B0D]">
-                  Email
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    placeholder="guardian@pawmatch.org"
-                    className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CEA74E]/40"
-                  />
-                </label>
+              <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+                {formError && (
+                  <div role="alert" className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {formError}
+                  </div>
+                )}
 
-                <label className="block text-sm font-semibold text-[#683B0D]">
-                  Password
-                  <div className="relative mt-2">
+                <div>
+                  <label htmlFor="login-email" className="block text-sm font-semibold text-[#683B0D]">Email</label>
+                  <input
+                    id="login-email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(event) => { setEmail(event.target.value); clearErrors('email') }}
+                    aria-invalid={Boolean(fieldErrors.email)}
+                    aria-describedby={fieldErrors.email ? 'login-email-error' : undefined}
+                    placeholder="you@example.com"
+                    className={inputClass(fieldErrors.email)}
+                  />
+                  {fieldErrors.email && (
+                    <p id="login-email-error" role="alert" className="mt-2 text-xs font-medium text-red-600">{fieldErrors.email}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="login-guardianId" className="block text-sm font-semibold text-[#683B0D]">
+                    Guardian ID <span className="font-normal text-[#989797]">(demo only -- e.g. G001)</span>
+                  </label>
+                  <input
+                    id="login-guardianId"
+                    type="text"
+                    value={guardianId}
+                    onChange={(event) => { setGuardianIdInput(event.target.value); clearErrors('guardianId') }}
+                    aria-invalid={Boolean(fieldErrors.guardianId)}
+                    aria-describedby={fieldErrors.guardianId ? 'login-guardianId-error' : undefined}
+                    placeholder="G001"
+                    className={inputClass(fieldErrors.guardianId)}
+                  />
+                  {fieldErrors.guardianId && (
+                    <p id="login-guardianId-error" role="alert" className="mt-2 text-xs font-medium text-red-600">{fieldErrors.guardianId}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="login-password" className="block text-sm font-semibold text-[#683B0D]">Password</label>
+                  <div className="relative">
                     <input
+                      id="login-password"
                       type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
                       value={password}
-                      onChange={(event) => setPassword(event.target.value)}
+                      onChange={(event) => { setPassword(event.target.value); clearErrors('password') }}
+                      aria-invalid={Boolean(fieldErrors.password)}
+                      aria-describedby={fieldErrors.password ? 'login-password-error' : undefined}
                       placeholder="Enter your password"
-                      className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 pr-12 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CEA74E]/40"
+                      className={inputClass(fieldErrors.password, 'pr-12')}
                     />
                     <button
                       type="button"
@@ -90,7 +169,10 @@ export default function GuardianLogIn() {
                       )}
                     </button>
                   </div>
-                </label>
+                  {fieldErrors.password && (
+                    <p id="login-password-error" role="alert" className="mt-2 text-xs font-medium text-red-600">{fieldErrors.password}</p>
+                  )}
+                </div>
 
                 <div className="flex items-center justify-between gap-2">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -112,9 +194,10 @@ export default function GuardianLogIn() {
                 </div>
                 <button
                   type="submit"
-                  className="w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
+                  disabled={submitting}
+                  className="w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Log in as Guardian
+                  {submitting ? 'Logging in…' : 'Log in as Guardian'}
                 </button>
               </form>
               <p className="text-sm text-[#989797]">
@@ -162,72 +245,34 @@ export default function GuardianLogIn() {
             className="w-full max-w-md rounded-[28px] bg-white p-8 shadow-2xl ring-1 ring-black/5"
             onClick={(event) => event.stopPropagation()}
           >
-            {!resetSent ? (
-              <>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.25em] text-[#683B0D]">Guardian access</p>
-                    <h2 className="mt-3 text-2xl font-semibold text-[#683B0D]">Reset your password</h2>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={closeForgotPasswordModal}
-                    className="text-[#989797] hover:text-[#683B0D] text-xl leading-none"
-                    aria-label="Close"
-                  >
-                    ×
-                  </button>
-                </div>
-                <p className="mt-3 text-sm text-[#989797]">
-                  Enter the email linked to your account and we'll send you a link to reset your password.
-                </p>
-                <form className="mt-6 space-y-5" onSubmit={handleForgotPasswordSubmit}>
-                  <label className="block text-sm font-semibold text-[#683B0D]">
-                    Email
-                    <input
-                      type="email"
-                      value={resetEmail}
-                      onChange={(event) => setResetEmail(event.target.value)}
-                      placeholder="guardian@pawmatch.org"
-                      className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CEA74E]/40"
-                    />
-                  </label>
-                  <button
-                    type="submit"
-                    className="w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
-                  >
-                    Send reset link
-                  </button>
-                </form>
-                <button
-                  type="button"
-                  onClick={closeForgotPasswordModal}
-                  className="mt-4 w-full text-center text-sm font-semibold text-[#683B0D] hover:text-[#CEA74E]"
-                >
-                  Back to log in
-                </button>
-              </>
-            ) : (
-              <div className="text-center">
-                <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-[#CEA74E]/20">
-                  <span className="text-2xl">✓</span>
-                </div>
-                <h2 className="text-2xl font-semibold text-[#683B0D]">Check your email</h2>
-                <p className="mt-3 text-sm text-[#989797]">
-                  We've sent a password reset link to <span className="font-semibold text-[#683B0D]">{resetEmail}</span>.
-                </p>
-                <button
-                  type="button"
-                  onClick={closeForgotPasswordModal}
-                  className="mt-6 w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
-                >
-                  Done
-                </button>
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-sm uppercase tracking-[0.25em] text-[#683B0D]">Guardian access</p>
+                <h2 className="mt-3 text-2xl font-semibold text-[#683B0D]">Reset your password</h2>
               </div>
-            )}
+              <button
+                type="button"
+                onClick={closeForgotPasswordModal}
+                className="text-[#989797] hover:text-[#683B0D] text-xl leading-none"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <p className="mt-4 text-sm leading-6 text-[#989797]">
+              Resetting a forgotten password by email isn't available yet, because the system can't send emails.
+              If you're already logged in, you can change your password from your Profile.
+            </p>
+            <button
+              type="button"
+              onClick={closeForgotPasswordModal}
+              className="mt-6 w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
+            >
+              Back to log in
+            </button>
           </div>
         </div>
       )}
     </div> 
   )
-}
+} 

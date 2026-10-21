@@ -4,24 +4,8 @@ import { X } from 'lucide-react'
 export default function AdoptionHistoryModal({ open, onClose }) {
   if (!open) return null
 
-  const adoptionHistory = [
-    {
-      petName: 'Coco',
-      breed: 'Rabbit',
-      adoptionDate: 'May 30, 2024',
-      image: 'https://images.unsplash.com/photo-1585110396000-c9ffd4d4b3f4?w=300&h=300&fit=crop',
-      status: 'Currently with us',
-      notes: 'Coco is a sweet and gentle rabbit who loves fresh vegetables and quiet spaces.'
-    },
-    {
-      petName: 'Whiskers',
-      breed: 'Siamese Cat',
-      adoptionDate: 'January 15, 2023',
-      image: 'https://images.unsplash.com/photo-1574158622682-e40e69881006?w=300&h=300&fit=crop',
-      status: 'Previously adopted',
-      notes: 'Whiskers was adopted but later returned. Very affectionate and loves playtime.'
-    }
-  ]
+  // No data source yet -- starts empty (never sample data). Load the real history here.
+  const adoptionHistory = []
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 sm:px-6">

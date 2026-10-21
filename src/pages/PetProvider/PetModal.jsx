@@ -1,6 +1,28 @@
-import { Heart, X } from 'lucide-react'
+import { X } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { LISTING_STATUSES } from '../../Data/ProviderSession.jsx'
 
-export default function PetModal({ pet, applications = [], onClose, onViewApplication }) {
+const statusColors = {
+  Available: 'bg-green-100 text-green-800',
+  Pending: 'bg-yellow-100 text-yellow-800',
+  Adopted: 'bg-blue-100 text-blue-800',
+  'Under Review': 'bg-orange-100 text-orange-800',
+  Approved: 'bg-green-100 text-green-800',
+  Declined: 'bg-red-100 text-red-700',
+}
+const getStatusColor = (status) => statusColors[status] || 'bg-[#CACACA]/20 text-gray-800'
+
+const formatDate = (iso) =>
+  iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : ''
+
+export default function PetModal({
+  pet,
+  applications = [],
+  onClose,
+  onViewApplication,
+  onChangeStatus,
+  onRemove,
+}) {
   if (!pet) return null
 
   const facts = [
@@ -10,6 +32,7 @@ export default function PetModal({ pet, applications = [], onClose, onViewApplic
     { label: 'Gender', value: pet.gender },
     { label: 'Size', value: pet.size },
     { label: 'Color', value: pet.color },
+    { label: 'Location', value: pet.area },
   ]
 
   const traits = [
@@ -20,24 +43,12 @@ export default function PetModal({ pet, applications = [], onClose, onViewApplic
     { label: 'Good with other pets', value: pet.goodWithPets },
   ]
 
-  const petApplications = applications.filter((app) => app.pet === pet.name)
+  // Requests are matched by pet id (names aren't unique).
+  const petApplications = applications.filter((app) => app.petId === pet.id)
 
-  const getStatusColor = (status) => {
-    const colors = {
-      'Available': 'bg-green-100 text-green-800',
-      'Pending': 'bg-yellow-100 text-yellow-800',
-      'Adopted': 'bg-blue-100 text-blue-800',
-      'Under Review': 'bg-orange-100 text-orange-800',
-      'New': 'bg-green-100 text-green-800',
-      'Interview': 'bg-blue-100 text-blue-800',
-      'Shortlisted': 'bg-[#683B0D]/10 text-[#683B0D]',
-    }
-    return colors[status] || 'bg-[#CACACA]/20 text-gray-800'
-  }
-
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 sm:px-6"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4 py-6 sm:px-6"
       onClick={onClose}
     >
       <div
@@ -45,7 +56,13 @@ export default function PetModal({ pet, applications = [], onClose, onViewApplic
         onClick={(event) => event.stopPropagation()}
       >
         <div className="relative h-64 w-full overflow-hidden bg-[#CACACA] sm:h-80">
-          <img src={pet.image} alt={pet.name} className="h-full w-full object-cover" />
+          {pet.image ? (
+            <img src={pet.image} alt={pet.name} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-6xl font-bold text-[#683B0D]/40">
+              {(pet.name || '?').charAt(0).toUpperCase()}
+            </div>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -54,10 +71,6 @@ export default function PetModal({ pet, applications = [], onClose, onViewApplic
           >
             <X className="h-5 w-5" />
           </button>
-          <div className="absolute right-4 bottom-4 flex items-center gap-2 rounded-full bg-white/90 px-4 py-2 text-[#683B0D] shadow-sm">
-            <Heart className="h-4 w-4 fill-current text-[#CEA74E]" />
-            <span className="text-sm font-semibold">{pet.likes ?? 0} likes</span>
-          </div>
         </div>
 
         <div className="max-h-[calc(100vh-320px)] overflow-y-auto p-6 sm:p-8">
@@ -114,11 +127,28 @@ export default function PetModal({ pet, applications = [], onClose, onViewApplic
             </div>
           </div>
 
+          <div className="mt-6 rounded-3xl border border-[#CACACA] bg-[#CACACA]/10 p-4">
+            <label className="block text-sm font-semibold text-[#683B0D]" htmlFor="listing-status">
+              Listing status
+            </label>
+            <p className="mt-1 text-xs text-[#989797]">
+              Only Available pets are shown to guardians.
+            </p>
+            <select
+              id="listing-status"
+              value={pet.status}
+              onChange={(event) => onChangeStatus?.(pet, event.target.value)}
+              className="mt-3 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CEA74E]/30 sm:w-64"
+            >
+              {LISTING_STATUSES.map((status) => (
+                <option key={status}>{status}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="mt-6">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-[#683B0D]">
-                Adoption Requests for {pet.name}
-              </p>
+              <p className="text-sm font-semibold text-[#683B0D]">Adoption Requests for {pet.name}</p>
               <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">
                 {petApplications.length} {petApplications.length === 1 ? 'request' : 'requests'}
               </span>
@@ -126,16 +156,18 @@ export default function PetModal({ pet, applications = [], onClose, onViewApplic
 
             {petApplications.length > 0 ? (
               <div className="mt-3 space-y-3">
-                {petApplications.map((app, index) => (
+                {petApplications.map((app) => (
                   <div
-                    key={`${app.name}-${index}`}
+                    key={app.id}
                     className="flex flex-col gap-3 rounded-3xl border border-[#CACACA] bg-[#CACACA]/10 p-4 sm:flex-row sm:items-center sm:justify-between"
                   >
                     <div className="flex items-center gap-3">
-                      <img src={app.avatar} alt={app.name} className="h-12 w-12 rounded-full object-cover" />
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#CEA74E]/25 font-bold text-[#683B0D]">
+                        {(app.name || '?').charAt(0).toUpperCase()}
+                      </div>
                       <div>
                         <p className="text-sm font-semibold text-[#683B0D]">{app.name}</p>
-                        <p className="text-xs text-[#989797]">{app.time}</p>
+                        <p className="text-xs text-[#989797]">{formatDate(app.createdAt)}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -160,7 +192,14 @@ export default function PetModal({ pet, applications = [], onClose, onViewApplic
             )}
           </div>
 
-          <div className="mt-8 flex justify-end">
+          <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <button
+              type="button"
+              onClick={() => onRemove?.(pet)}
+              className="rounded-full border border-red-200 bg-red-50 px-6 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-100"
+            >
+              Remove listing
+            </button>
             <button
               type="button"
               onClick={onClose}
@@ -171,6 +210,7 @@ export default function PetModal({ pet, applications = [], onClose, onViewApplic
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }

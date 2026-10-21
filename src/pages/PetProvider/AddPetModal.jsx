@@ -1,15 +1,43 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { X } from 'lucide-react';
+import SearchSelect from '../../components/SearchSelect.jsx';
+import AgeInput from '../../components/AgeInput.jsx';
+import { AREA_OPTIONS, COAT_COLORS, getBreedOptions, suggestSize } from '../../Data/Petbreeds.jsx';
+
+// Photos are shrunk before uploading (a raw phone photo can be several MB).
+const MAX_PHOTO_SIDE = 800
+
+function shrinkImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      const scale = Math.min(1, MAX_PHOTO_SIDE / Math.max(img.width, img.height))
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.round(img.width * scale)
+      canvas.height = Math.round(img.height * scale)
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+      URL.revokeObjectURL(url)
+      resolve(canvas.toDataURL('image/jpeg', 0.8))
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Could not read that image.'))
+    }
+    img.src = url
+  })
+}
 
 const DEFAULT_PET = {
-  image: 'https://via.placeholder.com/640x480.png?text=Pet+Image',
+  image: null,
   name: '',
   species: 'Dog',
   breed: '',
   age: '',
   gender: 'Male',
-  size: 'Medium',
+  size: 'Average pet-size',
   color: '',
+  area: '',
   vaccinated: false,
   spayedNeutered: false,
   houseTrained: false,
@@ -18,14 +46,27 @@ const DEFAULT_PET = {
   description: '',
   specialNeeds: '',
   status: 'Available',
-  health: 'Good Health',
 };
 
-const AddPetModal = ({ onClose, onSubmit, initialPet = {} }) => {
-  const [pet, setPet] = useState(() => ({
-    ...DEFAULT_PET,
-    ...initialPet,
-  }));
+// Used both to add a pet and (with initialPet = an existing listing) to edit one.
+const AddPetModal = ({ onClose, onSubmit, initialPet = {}, title, subtitle, submitLabel }) => {
+  const isEditing = Boolean(initialPet?.id);
+  const heading = title ?? (isEditing ? 'Edit pet listing' : 'Add pet for adoption');
+  const subheading =
+    subtitle ?? (isEditing ? 'Update the details, description and photo.' : 'Enter the pet details to create a listing.');
+  const buttonLabel = submitLabel ?? (isEditing ? 'Save changes' : 'Add pet');
+  const [pet, setPet] = useState(() => {
+    const merged = { ...DEFAULT_PET, ...initialPet };
+    // Saved listings can have empty/null values; the form expects strings.
+    ['name', 'breed', 'age', 'color', 'area', 'description', 'specialNeeds'].forEach((field) => {
+      merged[field] = merged[field] ?? '';
+    });
+    merged.size = merged.size || DEFAULT_PET.size;
+    merged.image = merged.image || null;
+    return merged;
+  });
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const updateField = (field, value) => {
     setPet((current) => ({
@@ -34,43 +75,71 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {} }) => {
     }));
   };
 
-  const handleImageUpload = (event) => {
+  // A breed belongs to a type of pet, so changing the type clears the breed.
+  const changeSpecies = (species) => {
+    setPet((current) => (current.species === species ? current : { ...current, species, breed: '' }));
+  };
+
+  // Picking a known breed fills in a typical size, unless the size was already chosen by hand.
+  const sizeTouched = useRef(isEditing);
+  const handleBreedPick = (breed) => {
+    if (sizeTouched.current) return;
+    const size = suggestSize(pet.species, breed);
+    if (size) updateField('size', size);
+  };
+
+  const handleImageUpload = async (event) => {
     const file = event.target.files?.[0];
 
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please upload a valid image file.');
+      setError('Please upload a valid image file.');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      updateField('image', reader.result);
-    };
-    reader.readAsDataURL(file);
+    try {
+      updateField('image', await shrinkImage(file));
+      setError('');
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!pet.name || !pet.breed || !pet.age) {
-      alert('Please fill in the pet\'s name, breed, and age before continuing.');
+    if (!pet.name.trim() || !pet.breed.trim() || !pet.age.trim()) {
+      setError("Please fill in the pet's name, breed, and age before continuing.");
       return;
     }
 
-    onSubmit({
+    setSaving(true);
+    setError('');
+    const result = await onSubmit({
       ...pet,
-      image: pet.image?.trim() || DEFAULT_PET.image,
+      image: pet.image || null,
       name: pet.name.trim(),
       breed: pet.breed.trim(),
       age: pet.age.trim(),
       color: pet.color.trim(),
+      area: pet.area.trim(),
       description: pet.description.trim(),
       specialNeeds: pet.specialNeeds.trim(),
       status: pet.status || 'Available',
-      health: pet.health || 'Good Health',
     });
+    setSaving(false);
+
+    // The dashboard closes the modal on success; show why it didn't otherwise.
+    if (result && !result.ok) {
+      setError(
+        result.reason === 'auth'
+          ? 'Please log in again to add a pet.'
+          : result.reason === 'photo'
+            ? "We couldn't upload the photo. Please try a different image, or add the pet without one."
+            : "We couldn't save this listing. Please try again."
+      );
+    }
   };
 
   return (
@@ -78,8 +147,8 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {} }) => {
       <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[28px] bg-white shadow-2xl ring-1 ring-black/5">
         <div className="flex items-center justify-between border-b border-[#CACACA] px-6 py-4">
           <div>
-            <h2 className="text-xl font-semibold text-[#683B0D]">Add pet for adoption</h2>
-            <p className="text-sm text-[#989797]">Enter the pet details to create a listing.</p>
+            <h2 className="text-xl font-semibold text-[#683B0D]">{heading}</h2>
+            <p className="text-sm text-[#989797]">{subheading}</p>
           </div>
           <button
             type="button"
@@ -90,7 +159,12 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {} }) => {
           </button>
         </div>
 
-        <form className="space-y-4 p-6 pt-4" onSubmit={handleSubmit}>
+        <form className="space-y-4 p-6 pt-4" onSubmit={handleSubmit} noValidate>
+          {error && (
+            <div role="alert" className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
           <div className="grid gap-6 sm:grid-cols-[1.1fr_1fr] items-start">
             <div className="space-y-2 text-sm font-semibold text-[#683B0D]">
               Pet image
@@ -110,6 +184,15 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {} }) => {
                   onChange={handleImageUpload}
                   className="block w-full text-sm text-[#683B0D] file:mr-4 file:rounded-full file:border-0 file:bg-[#683B0D] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#CEA74E]"
                 />
+                {pet.image && (
+                  <button
+                    type="button"
+                    onClick={() => updateField('image', null)}
+                    className="mt-3 rounded-full border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                  >
+                    Remove photo
+                  </button>
+                )}
               </div>
             </div>
 
@@ -129,7 +212,7 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {} }) => {
                 Type of Pet
                 <select
                   value={pet.species}
-                  onChange={(event) => updateField('species', event.target.value)}
+                  onChange={(event) => changeSpecies(event.target.value)}
                   className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
                 >
                   <option>Dog</option>
@@ -140,30 +223,25 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {} }) => {
                 </select>
               </label>
 
-              <label className="space-y-2 text-sm font-semibold text-[#683B0D]">
-                Breed
-                <input
-                  type="text"
+              <div className="space-y-2 text-sm font-semibold text-[#683B0D]">
+                <label htmlFor="pet-breed" className="block">Breed</label>
+                <SearchSelect
+                  id="pet-breed"
                   value={pet.breed}
-                  onChange={(event) => updateField('breed', event.target.value)}
-                  placeholder="Enter breed"
-                  className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
+                  onChange={(breed) => updateField('breed', breed)}
+                  onPick={handleBreedPick}
+                  options={getBreedOptions(pet.species)}
+                  placeholder={pet.species === 'Other' ? 'Type the kind of animal' : 'Search or pick a breed'}
                 />
-              </label>
+              </div>
             </div>
           </div>
 
           <div className="grid gap-6 sm:grid-cols-2">
-            <label className="space-y-2 text-sm font-semibold text-[#683B0D]">
-              Age
-              <input
-                type="text"
-                value={pet.age}
-                onChange={(event) => updateField('age', event.target.value)}
-                placeholder="e.g. 2 years"
-                className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
-              />
-            </label>
+            <div className="space-y-2 text-sm font-semibold text-[#683B0D]">
+              <label htmlFor="pet-age" className="block">Age</label>
+              <AgeInput id="pet-age" value={pet.age} onChange={(age) => updateField('age', age)} />
+            </div>
             <label className="space-y-2 text-sm font-semibold text-[#683B0D]">
               Sex
               <select
@@ -182,7 +260,10 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {} }) => {
               Size of Pet
               <select
                 value={pet.size}
-                onChange={(event) => updateField('size', event.target.value)}
+                onChange={(event) => {
+                  sizeTouched.current = true;
+                  updateField('size', event.target.value);
+                }}
                 className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
               >
                 <option>Tiny pet-size</option>
@@ -191,16 +272,29 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {} }) => {
                 <option>Big pet-size</option>
               </select>
             </label>
-            <label className="space-y-2 text-sm font-semibold text-[#683B0D]">
-              Color / Markings
-              <input
-                type="text"
+            <div className="space-y-2 text-sm font-semibold text-[#683B0D]">
+              <label htmlFor="pet-color" className="block">Color / Markings</label>
+              <SearchSelect
+                id="pet-color"
                 value={pet.color}
-                onChange={(event) => updateField('color', event.target.value)}
-                placeholder="Enter coat color"
-                className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
+                onChange={(color) => updateField('color', color)}
+                options={COAT_COLORS}
+                placeholder="Pick a color or describe it"
               />
-            </label>
+            </div>
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-1">
+            <div className="space-y-2 text-sm font-semibold text-[#683B0D]">
+              <label htmlFor="pet-area" className="block">Location (city / area)</label>
+              <SearchSelect
+                id="pet-area"
+                value={pet.area}
+                onChange={(area) => updateField('area', area)}
+                options={AREA_OPTIONS}
+                placeholder="Defaults to your profile location"
+              />
+            </div>
           </div>
 
           <div className="rounded-3xl border border-[#CACACA] bg-[#CACACA]/10 p-5">
@@ -286,9 +380,10 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {} }) => {
             </button>
             <button
               type="submit"
-              className="rounded-full bg-[#683B0D] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
+              disabled={saving}
+              className="rounded-full bg-[#683B0D] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Add pet
+              {saving ? 'Saving…' : buttonLabel}
             </button>
           </div>
         </form>

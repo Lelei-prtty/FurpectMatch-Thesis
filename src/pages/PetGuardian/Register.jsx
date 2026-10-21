@@ -3,6 +3,66 @@ import { Link, useNavigate } from 'react-router-dom'
 import PetPreferencesForm from '../../components/Petpreferencesform.jsx'
 import { DEFAULT_PET_PREFERENCES } from '../../Data/Petpreferencesoptions.jsx'
 import { savePetPreferences } from '../../Data/Petpreferencesstorage.jsx'
+import {
+  createAccount,
+  getPasswordChecks,
+  isEmailTaken,
+  startSession,
+  validateConfirmPassword,
+  validateEmail,
+  validateFullName,
+  validatePassword,
+  validatePhone,
+} from '../../Data/Accounts.jsx'
+
+const FIELD_ORDER = ['fullName', 'email', 'phone', 'password', 'confirmPassword']
+
+const inputClass = (hasError, extra = '') =>
+  `mt-2 w-full rounded-3xl border bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:ring-2 ${extra} ${
+    hasError
+      ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+      : 'border-[#CACACA] focus:border-[#CEA74E] focus:ring-[#CEA74E]/40'
+  }`
+
+function Field({ id, label, optional, error, hint, children }) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-semibold text-[#683B0D]">
+        {label}
+        {optional && <span className="ml-1 font-normal text-[#989797]">(optional)</span>}
+      </label>
+      {children}
+      {error ? (
+        <p id={`${id}-error`} role="alert" className="mt-2 text-xs font-medium text-red-600">{error}</p>
+      ) : hint ? (
+        <p className="mt-2 text-xs text-[#989797]">{hint}</p>
+      ) : null}
+    </div>
+  )
+}
+
+function EyeToggle({ shown, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="absolute right-4 top-1/2 -translate-y-1/2 text-[#989797] hover:text-[#683B0D]"
+      aria-label={shown ? 'Hide password' : 'Show password'}
+    >
+      {shown ? (
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+          <line x1="1" y1="1" x2="23" y2="23" />
+        </svg>
+      ) : (
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      )}
+    </button>
+  )
+}
 
 export default function GuardianRegister() {
   const navigate = useNavigate()
@@ -10,10 +70,19 @@ export default function GuardianRegister() {
   // Step 1 — account details
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  // Validation display: a field's error shows once it's been touched (left) or
+  // after the person tries to continue.
+  const [touched, setTouched] = useState({})
+  const [submitAttempted, setSubmitAttempted] = useState(false)
+  const [serverErrors, setServerErrors] = useState({}) // errors returned when saving
+  const [submitError, setSubmitError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   // Step 2 — adoption preferences & lifestyle
   const [preferences, setPreferences] = useState(DEFAULT_PET_PREFERENCES)
@@ -26,32 +95,86 @@ export default function GuardianRegister() {
     setPreferences((prev) => ({ ...prev, [field]: value }))
   }
 
+  const emailTaken = !validateEmail(email) && isEmailTaken(email)
+  const errors = {
+    fullName: validateFullName(fullName),
+    email: validateEmail(email) || (emailTaken ? 'taken' : ''),
+    phone: validatePhone(phone),
+    password: validatePassword(password, { email, fullName }),
+    confirmPassword: validateConfirmPassword(password, confirmPassword),
+  }
+  const passwordChecks = getPasswordChecks(password, { email, fullName })
+
+  const errorFor = (field) =>
+    serverErrors[field] || ((touched[field] || submitAttempted) ? errors[field] : '')
+
+  const touch = (field) => setTouched((prev) => ({ ...prev, [field]: true }))
+
+  // Typing in a field clears any error that came back from saving for that field.
+  const setField = (field, setter) => (event) => {
+    setter(event.target.value)
+    if (serverErrors[field]) setServerErrors((prev) => ({ ...prev, [field]: undefined }))
+    if (submitError) setSubmitError('')
+  }
+
+  const emailMessage = () => {
+    const error = errorFor('email')
+    if (!error) return ''
+    if (error === 'taken' || /already exists/.test(error)) {
+      return (
+        <>
+          An account with this email already exists.{' '}
+          <Link to="/guardian/login" className="underline">Log in instead</Link>
+        </>
+      )
+    }
+    return error
+  }
+
   const handleAccountSubmit = (event) => {
     event.preventDefault()
-    if (!fullName || !email || !password || !confirmPassword) {
-      alert('Please fill in all fields.')
-      return
-    }
-    if (password !== confirmPassword) {
-      alert('Passwords do not match.')
+    setSubmitAttempted(true)
+    const firstInvalid = FIELD_ORDER.find((field) => errors[field])
+    if (firstInvalid) {
+      document.getElementById(`reg-${firstInvalid}`)?.focus()
       return
     }
     setAccountCompleted(true)
     setActiveTab('preferences')
   }
 
-  const goToDashboard = () => {
-    savePetPreferences(preferences)
+  // Creates the account (this is where it's actually saved), signs the person in,
+  // and keeps their preferences only if they filled them in.
+  const finishRegistration = async (savePreferences) => {
+    setSubmitting(true)
+    setSubmitError('')
+    const result = await createAccount({ fullName, email, phone, password })
+    setSubmitting(false)
+
+    if (!result.ok) {
+      if (result.errors) {
+        setServerErrors(result.errors)
+        setSubmitAttempted(true)
+        setActiveTab('account')
+        setSubmitError('Please fix the highlighted fields to finish creating your account.')
+      } else {
+        setSubmitError(result.message || 'Something went wrong creating your account. Please try again.')
+      }
+      return
+    }
+
+    startSession(result.user, true)
+    if (savePreferences) savePetPreferences(preferences, result.user.id)
     navigate('/guardian/dashboard', { replace: true })
   }
 
   const handlePreferencesSubmit = (event) => {
     event.preventDefault()
-    goToDashboard()
+    finishRegistration(true)
   }
 
   const handleSkipPreferences = () => {
-    goToDashboard()
+    finishRegistration(false)
   }
 
   const isPreferencesTab = activeTab === 'preferences'
@@ -156,87 +279,107 @@ export default function GuardianRegister() {
               </div>
 
               {activeTab === 'account' && (
-                <form className="space-y-6" onSubmit={handleAccountSubmit}>
-                  <label className="block text-sm font-semibold text-[#683B0D]">
-                    Full Name
+                <form className="space-y-6" onSubmit={handleAccountSubmit} noValidate>
+                  {submitError && (
+                    <div role="alert" className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {submitError}
+                    </div>
+                  )}
+
+                  <Field id="reg-fullName" label="Full Name" error={errorFor('fullName')}>
                     <input
+                      id="reg-fullName"
                       type="text"
+                      autoComplete="name"
                       value={fullName}
-                      onChange={(event) => setFullName(event.target.value)}
-                      placeholder="Maria Santos"
-                      className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CEA74E]/40"
+                      onChange={setField('fullName', setFullName)}
+                      onBlur={() => touch('fullName')}
+                      aria-invalid={Boolean(errorFor('fullName'))}
+                      aria-describedby={errorFor('fullName') ? 'reg-fullName-error' : undefined}
+                      placeholder="Your full name"
+                      className={inputClass(errorFor('fullName'))}
                     />
-                  </label>
-                  <label className="block text-sm font-semibold text-[#683B0D]">
-                    Email
+                  </Field>
+
+                  <Field id="reg-email" label="Email" error={emailMessage()}>
                     <input
+                      id="reg-email"
                       type="email"
+                      autoComplete="email"
                       value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      placeholder="guardian@email.com"
-                      className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CEA74E]/40"
+                      onChange={setField('email', setEmail)}
+                      onBlur={() => touch('email')}
+                      aria-invalid={Boolean(errorFor('email'))}
+                      aria-describedby={errorFor('email') ? 'reg-email-error' : undefined}
+                      placeholder="you@example.com"
+                      className={inputClass(errorFor('email'))}
                     />
-                  </label>
-                  <label className="block text-sm font-semibold text-[#683B0D]">
-                    Password
-                    <div className="relative mt-2">
+                  </Field>
+
+                  <Field
+                    id="reg-phone"
+                    label="Mobile number"
+                    optional
+                    error={errorFor('phone')}
+                    hint="Philippine mobile number, e.g. 0917 123 4567."
+                  >
+                    <input
+                      id="reg-phone"
+                      type="tel"
+                      autoComplete="tel"
+                      value={phone}
+                      onChange={setField('phone', setPhone)}
+                      onBlur={() => touch('phone')}
+                      aria-invalid={Boolean(errorFor('phone'))}
+                      aria-describedby={errorFor('phone') ? 'reg-phone-error' : undefined}
+                      placeholder="0917 123 4567"
+                      className={inputClass(errorFor('phone'))}
+                    />
+                  </Field>
+
+                  <Field id="reg-password" label="Password" error={errorFor('password')}>
+                    <div className="relative">
                       <input
+                        id="reg-password"
                         type={showPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
                         value={password}
-                        onChange={(event) => setPassword(event.target.value)}
+                        onChange={setField('password', setPassword)}
+                        onBlur={() => touch('password')}
+                        aria-invalid={Boolean(errorFor('password'))}
+                        aria-describedby="reg-password-rules"
                         placeholder="Create a password"
-                        className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 pr-12 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CEA74E]/40"
+                        className={inputClass(errorFor('password'), 'pr-12')}
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((prev) => !prev)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-[#989797] hover:text-[#683B0D]"
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showPassword ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                            <line x1="1" y1="1" x2="23" y2="23" />
-                          </svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                            <circle cx="12" cy="12" r="3" />
-                          </svg>
-                        )}
-                      </button>
+                      <EyeToggle shown={showPassword} onClick={() => setShowPassword((prev) => !prev)} />
                     </div>
-                  </label>
-                  <label className="block text-sm font-semibold text-[#683B0D]">
-                    Confirm Password
-                    <div className="relative mt-2">
+                    <ul id="reg-password-rules" className="mt-3 grid gap-1 text-xs sm:grid-cols-2">
+                      {passwordChecks.map((check) => (
+                        <li key={check.id} className={check.ok ? 'text-green-700' : 'text-[#989797]'}>
+                          <span aria-hidden="true">{check.ok ? '✓' : '○'}</span> {check.label}
+                        </li>
+                      ))}
+                    </ul>
+                  </Field>
+
+                  <Field id="reg-confirmPassword" label="Confirm Password" error={errorFor('confirmPassword')}>
+                    <div className="relative">
                       <input
+                        id="reg-confirmPassword"
                         type={showConfirmPassword ? 'text' : 'password'}
+                        autoComplete="new-password"
                         value={confirmPassword}
-                        onChange={(event) => setConfirmPassword(event.target.value)}
+                        onChange={setField('confirmPassword', setConfirmPassword)}
+                        onBlur={() => touch('confirmPassword')}
+                        aria-invalid={Boolean(errorFor('confirmPassword'))}
+                        aria-describedby={errorFor('confirmPassword') ? 'reg-confirmPassword-error' : undefined}
                         placeholder="Re-enter password"
-                        className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 pr-12 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CEA74E]/40"
+                        className={inputClass(errorFor('confirmPassword'), 'pr-12')}
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPassword((prev) => !prev)}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-[#989797] hover:text-[#683B0D]"
-                        aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                      >
-                        {showConfirmPassword ? (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                            <line x1="1" y1="1" x2="23" y2="23" />
-                          </svg>
-                        ) : (
-                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                            <circle cx="12" cy="12" r="3" />
-                          </svg>
-                        )}
-                      </button>
+                      <EyeToggle shown={showConfirmPassword} onClick={() => setShowConfirmPassword((prev) => !prev)} />
                     </div>
-                  </label>
+                  </Field>
+
                   <button
                     type="submit"
                     className="w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
@@ -248,20 +391,27 @@ export default function GuardianRegister() {
 
               {activeTab === 'preferences' && (
                 <form className="space-y-6" onSubmit={handlePreferencesSubmit}>
+                  {submitError && (
+                    <div role="alert" className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {submitError}
+                    </div>
+                  )}
                   <PetPreferencesForm values={preferences} onFieldChange={handlePreferenceChange} />
                   <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <button
                       type="button"
                       onClick={handleSkipPreferences}
-                      className="text-sm font-semibold text-[#989797] underline-offset-2 hover:text-[#683B0D] hover:underline"
+                      disabled={submitting}
+                      className="text-sm font-semibold text-[#989797] underline-offset-2 hover:text-[#683B0D] hover:underline disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Skip for now, I'll set this up later
                     </button>
                     <button
                       type="submit"
-                      className="w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E] sm:w-auto"
+                      disabled={submitting}
+                      className="w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                     >
-                      Complete Registration
+                      {submitting ? 'Creating your account…' : 'Complete Registration'}
                     </button>
                   </div>
                 </form>

@@ -1,5 +1,18 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import SearchSelect from '../../components/SearchSelect.jsx'
+import AgeInput from '../../components/AgeInput.jsx'
+import { AREA_OPTIONS, COAT_COLORS, getBreedOptions, suggestSize } from '../../Data/Petbreeds.jsx'
+import { createPet } from '../../Data/Pets.jsx'
+import {
+  createAccount,
+  isEmailTaken,
+  startSession,
+  validateConfirmPassword,
+  validateEmail,
+  validateFullName,
+  validatePassword,
+} from '../../Data/Accounts.jsx'
 
 const DEFAULT_PET_INFO = {
   name: '',
@@ -7,8 +20,9 @@ const DEFAULT_PET_INFO = {
   breed: '',
   age: '',
   gender: 'Male',
-  size: 'Medium',
+  size: 'Average pet-size',
   color: '',
+  area: '',
   vaccinated: false,
   spayedNeutered: false,
   houseTrained: false,
@@ -36,7 +50,42 @@ export default function ProviderRegister() {
   const [activeTab, setActiveTab] = useState('account') // 'account' | 'pet'
   const [accountCompleted, setAccountCompleted] = useState(false)
 
+  const [submitAttempted, setSubmitAttempted] = useState(false)
+  const [petAttempted, setPetAttempted] = useState(false)
+  const [serverErrors, setServerErrors] = useState({})
+  const [submitError, setSubmitError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
   const isPetTab = activeTab === 'pet'
+
+  // Validation is derived from the fields, shown once the person has tried to continue.
+  const emailTaken = !validateEmail(email) && isEmailTaken(email)
+  const errors = {
+    fullName: validateFullName(fullName),
+    email: validateEmail(email) || (emailTaken ? 'An account with this email already exists. Try logging in instead.' : ''),
+    password: validatePassword(password, { email, fullName }),
+    confirmPassword: validateConfirmPassword(password, confirmPassword),
+  }
+  const shownError = (field) => (submitAttempted ? errors[field] || serverErrors[field] : '') || ''
+  const petErrors = {
+    name: petInfo.name.trim() ? '' : 'Enter the pet\'s name.',
+    breed: petInfo.breed.trim() ? '' : 'Enter the breed.',
+    age: petInfo.age.trim() ? '' : 'Enter the age, like 2 years.',
+  }
+  const shownPetError = (field) => (petAttempted ? petErrors[field] : '')
+
+  // A breed belongs to a type of pet, so changing the type clears the breed.
+  const handleSpeciesChange = (species) => {
+    setPetInfo((prev) => (prev.species === species ? prev : { ...prev, species, breed: '' }))
+  }
+
+  // Picking a known breed fills in a typical size, unless the size was already chosen by hand.
+  const sizeTouched = useRef(false)
+  const handleBreedPick = (breed) => {
+    if (sizeTouched.current) return
+    const size = suggestSize(petInfo.species, breed)
+    if (size) setPetInfo((prev) => ({ ...prev, size }))
+  }
 
   const handlePetInfoChange = (field, value) => {
     setPetInfo((prev) => ({ ...prev, [field]: value }))
@@ -44,29 +93,53 @@ export default function ProviderRegister() {
 
   const handleAccountSubmit = (event) => {
     event.preventDefault()
-    if (!fullName || !email || !password || !confirmPassword) {
-      alert('Please fill in all fields.')
+    setSubmitAttempted(true)
+    const firstInvalid = ['fullName', 'email', 'password', 'confirmPassword'].find((field) => errors[field])
+    if (firstInvalid) {
+      document.getElementById(`reg-${firstInvalid}`)?.focus()
       return
     }
-    if (password !== confirmPassword) {
-      alert('Passwords do not match.')
-      return
-    }
+    setServerErrors({})
     setAccountCompleted(true)
     setActiveTab('pet')
   }
 
-  const handlePetInfoSubmit = (event) => {
-    event.preventDefault()
-    if (!petInfo.name || !petInfo.breed || !petInfo.age) {
-      alert('Please fill in the pet\'s name, breed, and age before continuing.')
+  // The account is only created here, at the end (like the guardian flow).
+  // addPet = false when the provider skips the pet step.
+  const finishRegistration = async (addPet) => {
+    setSubmitting(true)
+    setSubmitError('')
+    const result = await createAccount({ fullName, email, password, role: 'provider' })
+    setSubmitting(false)
+
+    if (!result.ok) {
+      if (result.errors) {
+        setServerErrors(result.errors)
+        setSubmitAttempted(true)
+        setActiveTab('account')
+        setSubmitError('Please fix the highlighted fields to finish creating your account.')
+      } else {
+        setSubmitError(result.message || 'Something went wrong creating your account. Please try again.')
+      }
       return
     }
 
-    navigate('/provider/dashboard', {
-      replace: true,
-      state: { petInfo },
-    })
+    startSession(result.user, true)
+    if (addPet) {
+      const listing = await createPet(petInfo, result.user)
+      if (!listing.ok) {
+        // The account exists and they're signed in; the pet can be re-added from the dashboard.
+        alert("Your account was created, but we couldn't save the pet. You can add the pet again from your dashboard.")
+      }
+    }
+    navigate('/provider/dashboard', { replace: true })
+  }
+
+  const handlePetInfoSubmit = (event) => {
+    event.preventDefault()
+    setPetAttempted(true)
+    if (petErrors.name || petErrors.breed || petErrors.age) return
+    finishRegistration(true)
   }
 
   return (
@@ -169,16 +242,27 @@ export default function ProviderRegister() {
               </div>
 
               {activeTab === 'account' && (
-                <form className="space-y-6" onSubmit={handleAccountSubmit}>
+                <form className="space-y-6" onSubmit={handleAccountSubmit} noValidate>
+                  {submitError && (
+                    <div role="alert" className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {submitError}
+                    </div>
+                  )}
                   <label className="block text-sm font-semibold text-[#683B0D]">
                     Full Name
                     <input
                       type="text"
                       value={fullName}
                       onChange={(event) => setFullName(event.target.value)}
+                      id="reg-fullName"
+                      autoComplete="name"
+                      aria-invalid={Boolean(shownError('fullName'))}
                       placeholder="Maria Santos"
-                      className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
+                      className={`mt-2 w-full rounded-3xl border ${shownError('fullName') ? 'border-red-400' : 'border-[#CACACA]'} bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20`}
                     />
+                                    {shownError('fullName') && (
+                    <p role="alert" className="mt-2 text-xs font-medium text-red-600">{shownError('fullName')}</p>
+                  )}
                   </label>
                   <label className="block text-sm font-semibold text-[#683B0D]">
                     Email
@@ -186,9 +270,15 @@ export default function ProviderRegister() {
                       type="email"
                       value={email}
                       onChange={(event) => setEmail(event.target.value)}
+                      id="reg-email"
+                      autoComplete="email"
+                      aria-invalid={Boolean(shownError('email'))}
                       placeholder="provider@email.com"
-                      className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
+                      className={`mt-2 w-full rounded-3xl border ${shownError('email') ? 'border-red-400' : 'border-[#CACACA]'} bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20`}
                     />
+                                    {shownError('email') && (
+                    <p role="alert" className="mt-2 text-xs font-medium text-red-600">{shownError('email')}</p>
+                  )}
                   </label>
                   <label className="block text-sm font-semibold text-[#683B0D]">
                     Password
@@ -197,8 +287,11 @@ export default function ProviderRegister() {
                         type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
+                        id="reg-password"
+                        autoComplete="new-password"
+                        aria-invalid={Boolean(shownError('password'))}
                         placeholder="Create a password"
-                        className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 pr-12 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
+                        className={`w-full rounded-3xl border ${shownError('password') ? 'border-red-400' : 'border-[#CACACA]'} bg-white px-4 py-3 pr-12 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20`}
                       />
                       <button
                         type="button"
@@ -219,6 +312,9 @@ export default function ProviderRegister() {
                         )}
                       </button>
                     </div>
+                                    {shownError('password') && (
+                    <p role="alert" className="mt-2 text-xs font-medium text-red-600">{shownError('password')}</p>
+                  )}
                   </label>
                   <label className="block text-sm font-semibold text-[#683B0D]">
                     Confirm Password
@@ -227,8 +323,11 @@ export default function ProviderRegister() {
                         type={showConfirmPassword ? 'text' : 'password'}
                         value={confirmPassword}
                         onChange={(event) => setConfirmPassword(event.target.value)}
+                        id="reg-confirmPassword"
+                        autoComplete="new-password"
+                        aria-invalid={Boolean(shownError('confirmPassword'))}
                         placeholder="Re-enter password"
-                        className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 pr-12 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
+                        className={`w-full rounded-3xl border ${shownError('confirmPassword') ? 'border-red-400' : 'border-[#CACACA]'} bg-white px-4 py-3 pr-12 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20`}
                       />
                       <button
                         type="button"
@@ -249,6 +348,9 @@ export default function ProviderRegister() {
                         )}
                       </button>
                     </div>
+                                    {shownError('confirmPassword') && (
+                    <p role="alert" className="mt-2 text-xs font-medium text-red-600">{shownError('confirmPassword')}</p>
+                  )}
                   </label>
                   <button
                     type="submit"
@@ -260,7 +362,12 @@ export default function ProviderRegister() {
               )}
 
               {activeTab === 'pet' && (
-                <form className="space-y-6" onSubmit={handlePetInfoSubmit}>
+                <form className="space-y-6" onSubmit={handlePetInfoSubmit} noValidate>
+                  {submitError && (
+                    <div role="alert" className="rounded-3xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                      {submitError}
+                    </div>
+                  )}
                   <div className="grid gap-4 sm:grid-cols-2">
                     <label className="block text-sm font-semibold text-[#683B0D]">
                       Pet Name
@@ -271,12 +378,15 @@ export default function ProviderRegister() {
                         placeholder="Bantay"
                         className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
                       />
-                    </label>
+                                      {shownPetError('name') && (
+                    <p role="alert" className="mt-2 text-xs font-medium text-red-600">{shownPetError('name')}</p>
+                  )}
+                  </label>
                     <label className="block text-sm font-semibold text-[#683B0D]">
                       Type of Pet
                       <select
                         value={petInfo.species}
-                        onChange={(event) => handlePetInfoChange('species', event.target.value)}
+                        onChange={(event) => handleSpeciesChange(event.target.value)}
                         className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
                       >
                         <option>Dog</option>
@@ -286,26 +396,37 @@ export default function ProviderRegister() {
                         <option>Other</option>
                       </select>
                     </label>
-                    <label className="block text-sm font-semibold text-[#683B0D]">
-                      Breed
-                      <input
-                        type="text"
-                        value={petInfo.breed}
-                        onChange={(event) => handlePetInfoChange('breed', event.target.value)}
-                        placeholder="Aspin, Labrador, etc."
-                        className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
-                      />
-                    </label>
-                    <label className="block text-sm font-semibold text-[#683B0D]">
-                      Age
-                      <input
-                        type="text"
-                        value={petInfo.age}
-                        onChange={(event) => handlePetInfoChange('age', event.target.value)}
-                        placeholder="e.g. 2 years"
-                        className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
-                      />
-                    </label>
+                    <div className="block text-sm font-semibold text-[#683B0D]">
+                      <label htmlFor="reg-pet-breed">Breed</label>
+                      <div className="mt-2">
+                        <SearchSelect
+                          id="reg-pet-breed"
+                          value={petInfo.breed}
+                          onChange={(breed) => handlePetInfoChange('breed', breed)}
+                          onPick={handleBreedPick}
+                          options={getBreedOptions(petInfo.species)}
+                          placeholder={petInfo.species === 'Other' ? 'Type the kind of animal' : 'Search or pick a breed'}
+                          invalid={Boolean(shownPetError('breed'))}
+                        />
+                      </div>
+                      {shownPetError('breed') && (
+                      <p role="alert" className="mt-2 text-xs font-medium text-red-600">{shownPetError('breed')}</p>
+                    )}
+                    </div>
+                    <div className="block text-sm font-semibold text-[#683B0D]">
+                      <label htmlFor="reg-pet-age">Age</label>
+                      <div className="mt-2">
+                        <AgeInput
+                          id="reg-pet-age"
+                          value={petInfo.age}
+                          onChange={(age) => handlePetInfoChange('age', age)}
+                          invalid={Boolean(shownPetError('age'))}
+                        />
+                      </div>
+                      {shownPetError('age') && (
+                      <p role="alert" className="mt-2 text-xs font-medium text-red-600">{shownPetError('age')}</p>
+                    )}
+                    </div>
                     <label className="block text-sm font-semibold text-[#683B0D]">
                       Sex
                       <select
@@ -321,7 +442,10 @@ export default function ProviderRegister() {
                       Size of Pet
                       <select
                         value={petInfo.size}
-                        onChange={(event) => handlePetInfoChange('size', event.target.value)}
+                        onChange={(event) => {
+                          sizeTouched.current = true
+                          handlePetInfoChange('size', event.target.value)
+                        }}
                         className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
                       >
                         <option>Tiny pet-size</option>
@@ -330,16 +454,30 @@ export default function ProviderRegister() {
                         <option>Big pet-size</option>
                       </select>
                     </label>
-                    <label className="block text-sm font-semibold text-[#683B0D] sm:col-span-2">
-                      Color / Markings
-                      <input
-                        type="text"
-                        value={petInfo.color}
-                        onChange={(event) => handlePetInfoChange('color', event.target.value)}
-                        placeholder="Brown with white patches"
-                        className="mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20"
-                      />
-                    </label>
+                    <div className="block text-sm font-semibold text-[#683B0D] sm:col-span-2">
+                      <label htmlFor="reg-pet-color">Color / Markings</label>
+                      <div className="mt-2">
+                        <SearchSelect
+                          id="reg-pet-color"
+                          value={petInfo.color}
+                          onChange={(color) => handlePetInfoChange('color', color)}
+                          options={COAT_COLORS}
+                          placeholder="Pick a color or describe it"
+                        />
+                      </div>
+                    </div>
+                    <div className="block text-sm font-semibold text-[#683B0D] sm:col-span-2">
+                      <label htmlFor="reg-pet-area">Location (city / area)</label>
+                      <div className="mt-2">
+                        <SearchSelect
+                          id="reg-pet-area"
+                          value={petInfo.area}
+                          onChange={(area) => handlePetInfoChange('area', area)}
+                          options={AREA_OPTIONS}
+                          placeholder="Antipolo, Rizal"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <div className="rounded-3xl border border-[#CACACA] bg-[#CACACA]/10 p-5">
@@ -423,12 +561,23 @@ export default function ProviderRegister() {
                     >
                       Back to Account Details
                     </button>
-                    <button
-                      type="submit"
-                      className="w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E] sm:w-auto"
-                    >
-                      Complete Registration
-                    </button>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                      <button
+                        type="button"
+                        disabled={submitting}
+                        onClick={() => finishRegistration(false)}
+                        className="text-sm font-semibold text-[#683B0D] underline-offset-2 hover:text-[#CEA74E] hover:underline disabled:opacity-60"
+                      >
+                        Skip for now
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                      >
+                        {submitting ? 'Creating account…' : 'Complete Registration'}
+                      </button>
+                    </div>
                   </div>
                 </form>
               )}

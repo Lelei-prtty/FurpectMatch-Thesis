@@ -2,6 +2,7 @@ import React from 'react';
 import { LogOut, User, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import logo from '../../Assets/logo.svg';
+import { endSession } from '../../Data/Accounts.jsx';
 
 const SideBar = ({
   activeTab,
@@ -92,7 +93,10 @@ const SideBar = ({
         <div className="border-t border-[#CEA74E] p-4 space-y-2">
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => {
+              endSession();
+              navigate('/');
+            }}
             className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-black transition-colors hover:bg-[#CEA74E]/20"
           >
             <LogOut className="h-5 w-5 shrink-0" />

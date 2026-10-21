@@ -1,4 +1,4 @@
-import { Routes, Route, useParams, Navigate } from 'react-router-dom'
+import { Routes, Route, useParams, useLocation, Navigate } from 'react-router-dom'
 
 import HomePage from './pages/HomePage'
 import ProviderDashboard from './pages/PetProvider/ProviderDashboard'
@@ -12,6 +12,17 @@ import AddPetModal from './pages/PetProvider/AddPetModal'
 import PetModal from './pages/PetProvider/PetModal'
 import ApplicationModal from './pages/PetProvider/ApplicationModal'
 import MessageModal from './pages/PetProvider/MessageModal'
+import { getCurrentUser } from './Data/Accounts.jsx'
+
+// Guardian pages need a signed-in account. Anyone else is sent to the login page
+// and brought back to where they were headed after logging in.
+function RequireGuardian({ children }) {
+  const location = useLocation()
+  if (!getCurrentUser()) {
+    return <Navigate to="/guardian/login" replace state={{ from: location.pathname }} />
+  }
+  return children
+}
 
 export default function App() {
   const ProviderWithPet = () => {
@@ -47,7 +58,7 @@ export default function App() {
       <Route path="/provider/register" element={<ProviderRegister />} />
       <Route path="/guardian/login" element={<GuardianLogIn />} />
       <Route path="/guardian/register" element={<GuardianRegister />} />
-      <Route path="/guardian/dashboard" element={<GuardianDashboard />} />
+      <Route path="/guardian/dashboard" element={<RequireGuardian><GuardianDashboard /></RequireGuardian>} />
       <Route path="/guardian-dashboard" element={<Navigate to="/guardian/dashboard" replace />} />
       <Route path="/provider/dashboard" element={<ProviderDashboard />} />
       <Route path="/provider-dashboard" element={<Navigate to="/provider/dashboard" replace />} />
@@ -56,8 +67,8 @@ export default function App() {
       <Route path="/provider/pet/:petName" element={<ProviderWithPet />} />
       <Route path="/provider/application/:appName" element={<ProviderWithApplication />} />
       <Route path="/provider/message/:msgName" element={<ProviderWithMessage />} />
-      <Route path="/guardian/profile" element={<GuardianDashboard openProfileOnMount />} />
-      <Route path="/guardian/message/:msgName" element={<GuardianWithMessage />} />
+      <Route path="/guardian/profile" element={<RequireGuardian><GuardianDashboard openProfileOnMount /></RequireGuardian>} />
+      <Route path="/guardian/message/:msgName" element={<RequireGuardian><GuardianWithMessage /></RequireGuardian>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )

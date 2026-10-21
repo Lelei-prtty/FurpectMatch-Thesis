@@ -1,213 +1,305 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import {
+  changePassword,
+  formatPhone,
+  getPasswordChecks,
+  updateProfile,
+  validateConfirmPassword,
+} from '../../Data/Accounts.jsx'
 
-export default function Profile({ open, onClose }) {
-  const [fullName, setFullName] = useState('Juan Dela Cruz')
-  const [email, setEmail] = useState('juan@email.com')
-  const [phone, setPhone] = useState('0912 345 6789')
-  const [role] = useState('Provider')
-  const [bio, setBio] = useState('Pet lover and proud caregiver. Hoping to give a furry friend a better home!')
+const inputClass = (hasError) =>
+  `mt-2 w-full rounded-3xl border bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:ring-2 ${
+    hasError
+      ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+      : 'border-[#CACACA] focus:border-[#CEA74E] focus:ring-[#CEA74E]/40'
+  }`
 
-  const [adoptionUpdates, setAdoptionUpdates] = useState(true)
-  const [newPetMatches, setNewPetMatches] = useState(true)
-  const [tipsResources, setTipsResources] = useState(false)
-  const [marketing, setMarketing] = useState(false)
+const initialsOf = (name) =>
+  (name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join('')
 
-  const [profileVisibility, setProfileVisibility] = useState('Everyone')
-  const [showEmail, setShowEmail] = useState(false)
-  const [showPhone, setShowPhone] = useState(false)
+const formatMemberSince = (iso) => {
+  const date = iso ? new Date(iso) : null
+  return date && !Number.isNaN(date.getTime())
+    ? date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+    : ''
+}
 
-  const handleSave = (e) => {
-    e.preventDefault()
-    // Placeholder save action - replace with API call
-    console.log('Saving profile', { fullName, email, phone, bio })
-    alert('Profile saved (placeholder)')
-  }
+const Notice = ({ notice }) =>
+  notice ? (
+    <div
+      role="alert"
+      className={`rounded-3xl border px-4 py-3 text-sm ${
+        notice.tone === 'success'
+          ? 'border-green-200 bg-green-50 text-green-700'
+          : 'border-red-200 bg-red-50 text-red-700'
+      }`}
+    >
+      {notice.text}
+    </div>
+  ) : null
 
-  const handleDelete = () => {
-    if (window.confirm('Delete account and all of your data? This cannot be undone.')) {
-      console.log('Account deleted (placeholder)')
-      alert('Account deleted (placeholder)')
-    }
-  }
+const FieldError = ({ message }) =>
+  message ? <p role="alert" className="mt-2 text-xs font-medium text-red-600">{message}</p> : null
+
+const tabs = ['Personal Information', 'Password']
+
+export default function Profile({ open, onClose, user, onUserChange }) {
+  const [activeTab, setActiveTab] = useState(tabs[0])
+  const [profileDraft, setProfileDraft] = useState({ fullName: '', phone: '', location: '' })
+  const [profileErrors, setProfileErrors] = useState({})
+  const [profileNotice, setProfileNotice] = useState(null)
+  const [passwordDraft, setPasswordDraft] = useState({ current: '', next: '', confirm: '' })
+  const [passwordErrors, setPasswordErrors] = useState({})
+  const [passwordNotice, setPasswordNotice] = useState(null)
+  const [savingPassword, setSavingPassword] = useState(false)
+  const [showPasswords, setShowPasswords] = useState(false)
+
+  // Start from the saved account every time the modal opens.
+  useEffect(() => {
+    if (!open || !user) return
+    setActiveTab(tabs[0])
+    setProfileDraft({
+      fullName: user.fullName,
+      phone: user.phone ? formatPhone(user.phone) : '',
+      location: user.location || '',
+    })
+    setProfileErrors({})
+    setProfileNotice(null)
+    setPasswordDraft({ current: '', next: '', confirm: '' })
+    setPasswordErrors({})
+    setPasswordNotice(null)
+  }, [open, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) return null
 
+  const handleProfileSave = (event) => {
+    event.preventDefault()
+    setProfileNotice(null)
+    const result = updateProfile(user.id, profileDraft)
+    if (!result.ok) {
+      setProfileErrors(result.errors || {})
+      if (!result.errors) setProfileNotice({ tone: 'error', text: result.message })
+      return
+    }
+    setProfileErrors({})
+    setProfileDraft({
+      fullName: result.user.fullName,
+      phone: result.user.phone ? formatPhone(result.user.phone) : '',
+      location: result.user.location,
+    })
+    onUserChange?.(result.user)
+    setProfileNotice({ tone: 'success', text: 'Your profile has been updated.' })
+  }
+
+  const handlePasswordSave = async (event) => {
+    event.preventDefault()
+    setPasswordNotice(null)
+    const confirmError = validateConfirmPassword(passwordDraft.next, passwordDraft.confirm)
+    if (confirmError) {
+      setPasswordErrors({ confirm: confirmError })
+      return
+    }
+    setSavingPassword(true)
+    const result = await changePassword(user.id, passwordDraft.current, passwordDraft.next)
+    setSavingPassword(false)
+    if (!result.ok) {
+      setPasswordErrors(result.errors || {})
+      if (!result.errors) setPasswordNotice({ tone: 'error', text: result.message })
+      return
+    }
+    setPasswordErrors({})
+    setPasswordDraft({ current: '', next: '', confirm: '' })
+    setPasswordNotice({ tone: 'success', text: 'Your password has been changed.' })
+  }
+
+  const passwordChecks = getPasswordChecks(passwordDraft.next, { email: user?.email, fullName: user?.fullName })
+  const passwordInputType = showPasswords ? 'text' : 'password'
+  const memberSince = formatMemberSince(user?.createdAt)
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-4 sm:p-6">
-      <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-50 w-full max-w-6xl max-h-[90vh] overflow-auto">
-        <div className="rounded-2xl shadow-lg overflow-hidden bg-white">
-          <div className="p-6">
-            <div className="flex items-start justify-between mb-4">
-              <h3 className="text-xl font-semibold">Profile</h3>
-              <button onClick={onClose} className="text-[#989797] hover:text-[#683B0D]">Close</button>
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              {/* Left column */}
-              <aside className="col-span-1 space-y-6 lg:col-span-1">
-                <div className="rounded-2xl border border-gray-100 bg-white p-6 flex flex-col items-center gap-4">
-                  <img
-                    src={`https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=7c3aed&color=fff&size=256`}
-                    alt="Profile"
-                    className="h-28 w-28 rounded-full object-cover shadow-sm"
-                  />
-                  <div className="text-center">
-                    <p className="font-semibold text-[#683B0D]">{fullName}</p>
-                    <p className="text-sm text-[#989797]">{role}</p>
-                  </div>
-                  <input type="file" className="hidden" id="profilePic" />
-                  <label htmlFor="profilePic" className="inline-flex w-full items-center justify-center rounded-full border border-[#CACACA] bg-white px-4 py-2 text-sm font-medium text-[#683B0D] hover:bg-white">
-                    Change Photo
-                  </label>
-                </div>
-
-                <div className="rounded-2xl border border-gray-100 bg-white p-5">
-                  <h3 className="mb-4 text-lg font-semibold">Need Help?</h3>
-                  <ul className="space-y-3 text-sm text-[#683B0D]">
-                    <li className="flex items-center justify-between">
-                      <span>Help Center</span>
-                      <span className="text-[#989797]">›</span>
-                    </li>
-                    <li className="flex items-center justify-between">
-                      <span>Contact Support</span>
-                      <span className="text-[#989797]">›</span>
-                    </li>
-                    <li className="flex items-center justify-between">
-                      <span>Privacy Policy</span>
-                      <span className="text-[#989797]">›</span>
-                    </li>
-                  </ul>
-                </div>
-              </aside>
-
-              {/* Main column */}
-              <main className="col-span-1 lg:col-span-2 space-y-6">
-                <form onSubmit={handleSave} className="space-y-6">
-                  <div className="rounded-2xl border border-gray-100 bg-white p-6">
-                    <h2 className="mb-4 text-lg font-semibold">Account Information</h2>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                      <label className="block">
-                        <span className="text-sm font-medium text-[#683B0D]">Full Name</span>
-                        <input value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-2 w-full rounded-lg border border-[#CACACA] px-4 py-3 outline-none focus:border-[#CEA74E]-500 focus:ring-2 focus:ring-[#CEA74E]-50" />
-                      </label>
-                      <label className="block">
-                        <span className="text-sm font-medium text-[#683B0D]">Email</span>
-                        <input value={email} onChange={(e) => setEmail(e.target.value)} className="mt-2 w-full rounded-lg border border-[#CACACA] px-4 py-3 outline-none bg-white" />
-                      </label>
-                      <label className="block">
-                        <span className="text-sm font-medium text-[#683B0D]">Phone Number</span>
-                        <input value={phone} onChange={(e) => setPhone(e.target.value)} className="mt-2 w-full rounded-lg border border-[#CACACA] px-4 py-3 outline-none" />
-                      </label>
-                      <label className="block">
-                        <span className="text-sm font-medium text-[#683B0D]">Role</span>
-                        <input value={role} readOnly className="mt-2 w-full rounded-lg border border-[#CACACA] px-4 py-3 outline-none bg-white" />
-                      </label>
-                    </div>
-
-                    <label className="block mt-4">
-                      <span className="text-sm font-medium text-[#683B0D]">Bio</span>
-                      <textarea value={bio} onChange={(e) => setBio(e.target.value)} maxLength={250} className="mt-2 h-28 w-full rounded-lg border border-[#CACACA] px-4 py-3 outline-none" />
-                      <div className="mt-2 text-right text-xs text-[#989797]">{bio.length}/250</div>
-                    </label>
-
-                    <div className="mt-6 flex justify-end">
-                      <button type="submit" className="rounded-full bg-[#683B0D]600 px-6 py-2 text-sm font-semibold text-white hover:bg-[#683B0D]700">Save Changes</button>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-gray-100 bg-white p-6">
-                    <h2 className="mb-4 text-lg font-semibold">Email Preferences</h2>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">Adoption Updates</p>
-                          <p className="text-xs text-[#989797]">Receive updates about your applications</p>
-                        </div>
-                        <label className="inline-flex items-center">
-                          <input type="checkbox" checked={adoptionUpdates} onChange={(e) => setAdoptionUpdates(e.target.checked)} className="h-5 w-10 rounded-full accent-[#683B0D]" />
-                        </label>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">New Pet Matches</p>
-                          <p className="text-xs text-[#989797]">Get notified when new pets match your preferences</p>
-                        </div>
-                        <label className="inline-flex items-center">
-                          <input type="checkbox" checked={newPetMatches} onChange={(e) => setNewPetMatches(e.target.checked)} className="h-5 w-10 rounded-full accent-[#683B0D]" />
-                        </label>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">Tips & Resources</p>
-                          <p className="text-xs text-[#989797]">Receive helpful tips and pet care resources</p>
-                        </div>
-                        <label className="inline-flex items-center">
-                          <input type="checkbox" checked={tipsResources} onChange={(e) => setTipsResources(e.target.checked)} className="h-5 w-10 rounded-full accent-[#683B0D]" />
-                        </label>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">Marketing & Promotions</p>
-                          <p className="text-xs text-[#989797]">Receive news and special offers</p>
-                        </div>
-                        <label className="inline-flex items-center">
-                          <input type="checkbox" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} className="h-5 w-10 rounded-full accent-[#683B0D]" />
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-gray-100 bg-white p-6">
-                    <h2 className="mb-4 text-lg font-semibold">Privacy</h2>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <label className="block">
-                        <span className="text-sm font-medium text-[#683B0D]">Profile Visibility</span>
-                        <select value={profileVisibility} onChange={(e) => setProfileVisibility(e.target.value)} className="mt-2 w-full rounded-lg border border-[#CACACA] px-4 py-3 outline-none">
-                          <option>Everyone</option>
-                          <option>Only Me</option>
-                          <option>Connected Users</option>
-                        </select>
-                      </label>
-
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">Show My Email</p>
-                            <p className="text-xs text-[#989797]">Allow others to see your email</p>
-                          </div>
-                          <label className="inline-flex items-center">
-                            <input type="checkbox" checked={showEmail} onChange={(e) => setShowEmail(e.target.checked)} className="h-5 w-10 rounded-full accent-[#683B0D]" />
-                          </label>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">Show My Phone Number</p>
-                            <p className="text-xs text-[#989797]">Allow others to see your phone number</p>
-                          </div>
-                          <label className="inline-flex items-center">
-                            <input type="checkbox" checked={showPhone} onChange={(e) => setShowPhone(e.target.checked)} className="h-5 w-10 rounded-full accent-[#683B0D]" />
-                          </label>
-                        </div>
-
-                        <div className="mt-2 flex items-center justify-between border-t pt-3">
-                          <div>
-                            <p className="font-medium text-red-500">Delete Account</p>
-                            <p className="text-xs text-[#989797]">Permanently delete your account and all of your data.</p>
-                          </div>
-                          <button onClick={handleDelete} type="button" className="rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 hover:bg-red-100">Delete Account</button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </form>
-              </main>
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 sm:px-6">
+      <div className="w-full max-w-4xl overflow-hidden rounded-4xl bg-white shadow-2xl ring-1 ring-black/10">
+        <div className="flex flex-col gap-4 border-b border-[#CACACA] bg-[#683B0D] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#CEA74E]">My Profile</p>
+            <p className="mt-2 text-2xl font-semibold text-white">Manage your provider account</p>
           </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center justify-center rounded-full bg-white px-3 py-2 text-sm font-semibold text-[#683B0D] shadow-sm ring-1 ring-[#CACACA] transition hover:bg-[#CACACA]"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-4 border-b border-[#CACACA] bg-white px-5 py-4 sm:flex-row sm:items-center sm:px-6">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                activeTab === tab ? 'bg-[#683B0D] text-white' : 'bg-[#CACACA]/30 text-[#989797] hover:bg-[#CACACA]/50'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        <div className="max-h-[calc(100vh-232px)] overflow-y-auto p-5 sm:p-6">
+          {!user ? (
+            <p className="text-sm text-[#989797]">Please log in again to see your profile.</p>
+          ) : activeTab === 'Personal Information' ? (
+            <div className="grid gap-6 lg:grid-cols-[280px_auto]">
+              <div className="h-fit rounded-4xl border border-[#CACACA] bg-[#CACACA]/20 p-6 shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div
+                    className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-[#CEA74E]/25 text-2xl font-bold text-[#683B0D]"
+                    aria-hidden="true"
+                  >
+                    {initialsOf(user.fullName)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-lg font-semibold text-[#683B0D]">{user.fullName}</p>
+                    <p className="text-sm text-[#989797]">Pet Provider</p>
+                  </div>
+                </div>
+                <p className="mt-4 break-all text-sm text-[#683B0D]">{user.email}</p>
+                {memberSince && <p className="mt-1 text-xs text-[#989797]">Member since {memberSince}</p>}
+              </div>
+
+              <form className="space-y-5" onSubmit={handleProfileSave} noValidate>
+                <Notice notice={profileNotice} />
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="pf-name" className="block text-sm font-semibold text-[#683B0D]">Full name</label>
+                    <input
+                      id="pf-name"
+                      value={profileDraft.fullName}
+                      onChange={(e) => { setProfileDraft((p) => ({ ...p, fullName: e.target.value })); setProfileErrors((p) => ({ ...p, fullName: undefined })) }}
+                      aria-invalid={Boolean(profileErrors.fullName)}
+                      className={inputClass(profileErrors.fullName)}
+                    />
+                    <FieldError message={profileErrors.fullName} />
+                  </div>
+                  <div>
+                    <label htmlFor="pf-email" className="block text-sm font-semibold text-[#683B0D]">Email</label>
+                    <input
+                      id="pf-email"
+                      value={user.email}
+                      readOnly
+                      className="mt-2 w-full cursor-not-allowed rounded-3xl border border-[#CACACA] bg-[#CACACA]/20 px-4 py-3 text-sm text-[#989797] outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="pf-phone" className="block text-sm font-semibold text-[#683B0D]">Mobile number</label>
+                    <input
+                      id="pf-phone"
+                      value={profileDraft.phone}
+                      onChange={(e) => { setProfileDraft((p) => ({ ...p, phone: e.target.value })); setProfileErrors((p) => ({ ...p, phone: undefined })) }}
+                      aria-invalid={Boolean(profileErrors.phone)}
+                      placeholder="0917 123 4567"
+                      className={inputClass(profileErrors.phone)}
+                    />
+                    <FieldError message={profileErrors.phone} />
+                  </div>
+                  <div>
+                    <label htmlFor="pf-location" className="block text-sm font-semibold text-[#683B0D]">Location</label>
+                    <input
+                      id="pf-location"
+                      value={profileDraft.location}
+                      onChange={(e) => { setProfileDraft((p) => ({ ...p, location: e.target.value })); setProfileErrors((p) => ({ ...p, location: undefined })) }}
+                      aria-invalid={Boolean(profileErrors.location)}
+                      placeholder="Antipolo, Rizal"
+                      className={inputClass(profileErrors.location)}
+                    />
+                    <FieldError message={profileErrors.location} />
+                    <p className="mt-1 text-xs text-[#989797]">Used as the default location for new pet listings.</p>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
+                  >
+                    Save changes
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : (
+            <form className="mx-auto max-w-lg space-y-5" onSubmit={handlePasswordSave} noValidate>
+              <Notice notice={passwordNotice} />
+              <div>
+                <label htmlFor="pw-current" className="block text-sm font-semibold text-[#683B0D]">Current password</label>
+                <input
+                  id="pw-current"
+                  type={passwordInputType}
+                  autoComplete="current-password"
+                  value={passwordDraft.current}
+                  onChange={(e) => { setPasswordDraft((p) => ({ ...p, current: e.target.value })); setPasswordErrors((p) => ({ ...p, currentPassword: undefined })) }}
+                  aria-invalid={Boolean(passwordErrors.currentPassword)}
+                  className={inputClass(passwordErrors.currentPassword)}
+                />
+                <FieldError message={passwordErrors.currentPassword} />
+              </div>
+              <div>
+                <label htmlFor="pw-new" className="block text-sm font-semibold text-[#683B0D]">New password</label>
+                <input
+                  id="pw-new"
+                  type={passwordInputType}
+                  autoComplete="new-password"
+                  value={passwordDraft.next}
+                  onChange={(e) => { setPasswordDraft((p) => ({ ...p, next: e.target.value })); setPasswordErrors((p) => ({ ...p, newPassword: undefined })) }}
+                  aria-invalid={Boolean(passwordErrors.newPassword)}
+                  className={inputClass(passwordErrors.newPassword)}
+                />
+                <FieldError message={passwordErrors.newPassword} />
+                {passwordDraft.next && (
+                  <ul className="mt-3 space-y-1 text-xs">
+                    {passwordChecks.map((check) => (
+                      <li key={check.id} className={check.ok ? 'text-green-700' : 'text-[#989797]'}>
+                        {check.ok ? '✓' : '○'} {check.label}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div>
+                <label htmlFor="pw-confirm" className="block text-sm font-semibold text-[#683B0D]">Confirm new password</label>
+                <input
+                  id="pw-confirm"
+                  type={passwordInputType}
+                  autoComplete="new-password"
+                  value={passwordDraft.confirm}
+                  onChange={(e) => { setPasswordDraft((p) => ({ ...p, confirm: e.target.value })); setPasswordErrors((p) => ({ ...p, confirm: undefined })) }}
+                  aria-invalid={Boolean(passwordErrors.confirm)}
+                  className={inputClass(passwordErrors.confirm)}
+                />
+                <FieldError message={passwordErrors.confirm} />
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-[#989797]">
+                <input
+                  type="checkbox"
+                  checked={showPasswords}
+                  onChange={(e) => setShowPasswords(e.target.checked)}
+                  className="h-4 w-4 rounded border-[#CACACA] text-[#683B0D] focus:ring-[#CEA74E]"
+                />
+                Show passwords
+              </label>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={savingPassword}
+                  className="rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {savingPassword ? 'Saving…' : 'Change password'}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     </div>

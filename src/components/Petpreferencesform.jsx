@@ -1,5 +1,8 @@
+import { useEffect, useRef } from 'react'
 import ToggleYesNo from './Toggleyesno'
 import ScaleSelector from './Scaleselector'
+import SearchSelect from './SearchSelect.jsx'
+import { NO_PREFERENCE, getPreferenceBreedOptions } from '../Data/Petbreeds.jsx'
 import {
   METRO_MANILA_AREAS,
   PET_TYPES,
@@ -10,7 +13,7 @@ import {
   HOUSING_TYPE_OPTIONS,
   EXERCISE_TIME_OPTIONS,
   PET_STAY_OPTIONS,
-} from '../data/petPreferencesOptions'
+} from '../Data/Petpreferencesoptions.jsx'
 
 const selectClasses =
   'mt-2 w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CEA74E]/40'
@@ -21,6 +24,19 @@ const sectionLabelClasses = 'text-sm font-semibold uppercase tracking-[0.2em] te
 export default function PetPreferencesForm({ values, onFieldChange }) {
   const set = (field) => (event) => onFieldChange(field, event.target.value)
   const setValue = (field) => (value) => onFieldChange(field, value)
+
+  // The breed question depends on the type of pet. If the person switches to a different
+  // type, a breed picked for the old type no longer applies, so clear it.
+  const breedOptions = getPreferenceBreedOptions(values.petType)
+  const previousPetType = useRef(values.petType)
+  useEffect(() => {
+    const before = previousPetType.current
+    previousPetType.current = values.petType
+    if (!before || before === values.petType) return // first load, or no real change
+    const breed = (values.breedPreference || '').trim().toLowerCase()
+    const stillValid = !breed || breedOptions.some((option) => option.toLowerCase() === breed)
+    if (!stillValid) onFieldChange('breedPreference', '')
+  }, [values.petType]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="space-y-6">
@@ -87,16 +103,19 @@ export default function PetPreferencesForm({ values, onFieldChange }) {
               ))}
             </select>
           </label>
-          <label className="block text-sm font-semibold text-[#683B0D]">
-            What breed do you prefer?
-            <input
-              type="text"
-              className={selectClasses}
-              placeholder="e.g. No Preference"
-              value={values.breedPreference}
-              onChange={set('breedPreference')}
-            />
-          </label>
+          <div className="block text-sm font-semibold text-[#683B0D]">
+            <label htmlFor="pref-breed">What breed do you prefer?</label>
+            <div className="mt-2">
+              <SearchSelect
+                id="pref-breed"
+                value={values.breedPreference}
+                onChange={setValue('breedPreference')}
+                options={breedOptions}
+                disabled={!values.petType}
+                placeholder={values.petType ? `${NO_PREFERENCE}, or search a breed` : 'Pick the pet type first'}
+              />
+            </div>
+          </div>
           <label className="block text-sm font-semibold text-[#683B0D]">
             What age range do you prefer?
             <select className={selectClasses} value={values.ageRangePreference} onChange={set('ageRangePreference')}>

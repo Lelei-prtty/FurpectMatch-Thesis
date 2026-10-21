@@ -3,25 +3,134 @@ import PetPreferencesForm from '../../components/Petpreferencesform.jsx'
 import PetPreferencesSummary from '../../Data/Petpreferencessummary.jsx'
 import { DEFAULT_PET_PREFERENCES } from '../../Data/Petpreferencesoptions.jsx'
 import { getPetPreferences, hasPetPreferences, savePetPreferences } from '../../Data/Petpreferencesstorage.jsx'
+import {
+  changePassword,
+  formatPhone,
+  getPasswordChecks,
+  updateProfile,
+  validateConfirmPassword,
+} from '../../Data/Accounts.jsx'
 
-export default function ProfileModal({ open, onClose }) {
+const inputClass = (hasError) =>
+  `mt-2 w-full rounded-3xl border bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:ring-2 ${
+    hasError
+      ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+      : 'border-[#CACACA] focus:border-[#CEA74E] focus:ring-[#CEA74E]/40'
+  }`
+
+const initialsOf = (name) =>
+  (name || '').split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0].toUpperCase()).join('')
+
+const formatMemberSince = (iso) => {
+  const date = iso ? new Date(iso) : null
+  return date && !Number.isNaN(date.getTime())
+    ? date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+    : ''
+}
+
+function FieldError({ id, message }) {
+  return message ? (
+    <p id={id} role="alert" className="mt-2 text-xs font-medium text-red-600">{message}</p>
+  ) : null
+}
+
+function Notice({ tone, children }) {
+  const styles = tone === 'success'
+    ? 'border-green-200 bg-green-50 text-green-800'
+    : 'border-red-200 bg-red-50 text-red-700'
+  return (
+    <div role={tone === 'success' ? 'status' : 'alert'} className={`rounded-3xl border px-4 py-3 text-sm ${styles}`}>
+      {children}
+    </div>
+  )
+}
+
+export default function ProfileModal({ open, onClose, user, onUserChange, initialTab, onPreferencesSaved }) {
   const [activeTab, setActiveTab] = useState('Personal Information')
   const [petPreferences, setPetPreferences] = useState(DEFAULT_PET_PREFERENCES)
   const [draftPetPreferences, setDraftPetPreferences] = useState(DEFAULT_PET_PREFERENCES)
   const [isEditingPetPreferences, setIsEditingPetPreferences] = useState(false)
 
+  // Personal information form (name / phone / location). Email can't be changed.
+  const [profileDraft, setProfileDraft] = useState({ fullName: '', phone: '', location: '' })
+  const [profileErrors, setProfileErrors] = useState({})
+  const [profileNotice, setProfileNotice] = useState(null) // { tone, text }
+
+  // Change-password form
+  const [passwordDraft, setPasswordDraft] = useState({ current: '', next: '', confirm: '' })
+  const [passwordErrors, setPasswordErrors] = useState({})
+  const [passwordNotice, setPasswordNotice] = useState(null)
+  const [showPasswords, setShowPasswords] = useState(false)
+  const [savingPassword, setSavingPassword] = useState(false)
+
   useEffect(() => {
     if (!open) return
     const stored = getPetPreferences()
-    if (stored) {
-      setPetPreferences(stored)
-      setDraftPetPreferences(stored)
-    }
-  }, [open])
+    setPetPreferences(stored || DEFAULT_PET_PREFERENCES)
+    setDraftPetPreferences(stored || DEFAULT_PET_PREFERENCES)
+    setIsEditingPetPreferences(false)
+
+    // Start every opening with the saved values and a clean slate.
+    setActiveTab(initialTab || 'Personal Information')
+    setProfileDraft({
+      fullName: user?.fullName || '',
+      phone: user?.phone ? formatPhone(user.phone) : '',
+      location: user?.location || '',
+    })
+    setProfileErrors({})
+    setProfileNotice(null)
+    setPasswordDraft({ current: '', next: '', confirm: '' })
+    setPasswordErrors({})
+    setPasswordNotice(null)
+    setShowPasswords(false)
+  }, [open, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) return null
 
   const tabs = ['Personal Information', 'Preferences & Lifestyle']
+
+  const handleProfileSave = (event) => {
+    event.preventDefault()
+    setProfileNotice(null)
+    const result = updateProfile(user.id, profileDraft)
+    if (!result.ok) {
+      setProfileErrors(result.errors || {})
+      if (!result.errors) setProfileNotice({ tone: 'error', text: result.message })
+      return
+    }
+    setProfileErrors({})
+    setProfileDraft({
+      fullName: result.user.fullName,
+      phone: result.user.phone ? formatPhone(result.user.phone) : '',
+      location: result.user.location,
+    })
+    onUserChange?.(result.user)
+    setProfileNotice({ tone: 'success', text: 'Your profile has been updated.' })
+  }
+
+  const handlePasswordSave = async (event) => {
+    event.preventDefault()
+    setPasswordNotice(null)
+    const confirmError = validateConfirmPassword(passwordDraft.next, passwordDraft.confirm)
+    if (confirmError) {
+      setPasswordErrors({ confirm: confirmError })
+      return
+    }
+    setSavingPassword(true)
+    const result = await changePassword(user.id, passwordDraft.current, passwordDraft.next)
+    setSavingPassword(false)
+    if (!result.ok) {
+      setPasswordErrors(result.errors || {})
+      if (!result.errors) setPasswordNotice({ tone: 'error', text: result.message })
+      return
+    }
+    setPasswordErrors({})
+    setPasswordDraft({ current: '', next: '', confirm: '' })
+    setPasswordNotice({ tone: 'success', text: 'Your password has been changed.' })
+  }
+
+  const passwordChecks = getPasswordChecks(passwordDraft.next, { email: user?.email, fullName: user?.fullName })
+  const passwordInputType = showPasswords ? 'text' : 'password'
 
   const handlePetPreferenceFieldChange = (field, value) => {
     setDraftPetPreferences((prev) => ({ ...prev, [field]: value }))
@@ -41,6 +150,7 @@ export default function ProfileModal({ open, onClose }) {
     setPetPreferences(draftPetPreferences)
     savePetPreferences(draftPetPreferences)
     setIsEditingPetPreferences(false)
+    onPreferencesSaved?.() // lets the dashboard re-score the recommendations
   }
 
   return (
@@ -78,175 +188,211 @@ export default function ProfileModal({ open, onClose }) {
         <div className="max-h-[calc(100vh-172px)] overflow-y-auto p-5 sm:p-6">
           {activeTab === 'Personal Information' && (
             <div className="space-y-6">
-              <div className="grid gap-6 lg:grid-cols-[320px_auto]">
-                <div className="rounded-4xl border border-[#CACACA] bg-[#CACACA]/20 p-6 shadow-sm">
-                  <div className="flex items-center gap-4">
-                    <div className="relative h-24 w-24 overflow-hidden rounded-3xl bg-[#CACACA]">
-                      <img
-                        src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=256&q=80"
-                        alt="User placeholder"
-                        className="h-full w-full object-cover"
-                      />
-                      <div className="absolute bottom-3 right-3 rounded-full bg-white p-2 shadow-sm">
-                        <span className="block h-3.5 w-3.5 rounded-full bg-[#683B0D]" />
+              {!user ? (
+                <p className="text-sm text-[#989797]">Please log in again to see your profile.</p>
+              ) : (
+                <div className="grid gap-6 lg:grid-cols-[320px_auto]">
+                  {/* Summary of the saved account details */}
+                  <div className="h-fit rounded-4xl border border-[#CACACA] bg-[#CACACA]/20 p-6 shadow-sm">
+                    <div className="flex items-center gap-4">
+                      <div
+                        className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-[#CEA74E]/25 text-2xl font-bold text-[#683B0D]"
+                        aria-hidden="true"
+                      >
+                        {initialsOf(user.fullName) || '?'}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="break-words text-xl font-semibold text-[#683B0D]">{user.fullName}</p>
+                        <p className="mt-1 text-sm text-[#989797]">Pet Guardian</p>
                       </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-semibold text-[#989797]">Full Name</p>
-                      <p className="mt-2 text-xl font-semibold text-[#683B0D]">Juan Dela Cruz</p>
-                      <p className="mt-4 text-sm text-[#989797]">Pet Guardian</p>
-                    </div>
-                  </div>
-                  <div className="mt-6 space-y-4">
-                    <div>
-                      <p className="text-sm text-[#989797]">Email</p>
-                      <p className="mt-1 text-base font-medium text-[#683B0D]">juan@email.com</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-[#989797]">Phone</p>
-                      <p className="mt-1 text-base font-medium text-[#683B0D]">+1 (555) 123-4567</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-[#989797]">Location</p>
-                      <p className="mt-1 text-base font-medium text-[#683B0D]">San Francisco, CA</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-6">
-                  <div className="rounded-4xl border border-[#CACACA] bg-white p-6 shadow-sm">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-semibold text-[#683B0D]">About You</p>
-                        <p className="mt-2 text-sm text-[#989797]">Tell us about yourself</p>
-                      </div>
-                      <button className="rounded-full bg-[#683B0D] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#CEA74E]">
-                        Edit
-                      </button>
-                    </div>
-                    <p className="mt-4 text-sm leading-7 text-[#989797]">
-                      I&apos;m an animal lover looking to adopt a furry companion to join my family. I have experience with pets and a fenced yard.
-                    </p>
-                    <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                      <div className="rounded-3xl bg-[#CACACA]/20 p-4">
-                        <p className="text-xs uppercase tracking-[0.2em] text-[#989797]">Occupation</p>
-                        <p className="mt-2 text-sm font-semibold text-[#683B0D]">Software Engineer</p>
-                      </div>
-                      <div className="rounded-3xl bg-[#CACACA]/20 p-4">
-                        <p className="text-xs uppercase tracking-[0.2em] text-[#989797]">Housing Type</p>
-                        <p className="mt-2 text-sm font-semibold text-[#683B0D]">Apartment</p>
-                      </div>
-                      <div className="rounded-3xl bg-[#CACACA]/20 p-4">
-                        <p className="text-xs uppercase tracking-[0.2em] text-[#989797]">Living Situation</p>
-                        <p className="mt-2 text-sm font-semibold text-[#683B0D]">Live with partner</p>
-                      </div>
-                      <div className="rounded-3xl bg-[#CACACA]/20 p-4">
-                        <p className="text-xs uppercase tracking-[0.2em] text-[#989797]">Experience</p>
-                        <p className="mt-2 text-sm font-semibold text-[#683B0D]">5+ years</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="rounded-4xl border border-[#CACACA] bg-white p-6 shadow-sm">
-                    <div className="flex items-center justify-between gap-4">
-                      <div>
-                        <p className="text-sm font-semibold text-[#683B0D]">Account Settings</p>
-                        <p className="mt-2 text-sm text-[#989797]">Manage how you sign in and hear updates.</p>
-                      </div>
-                    </div>
-                    <div className="mt-6 space-y-3">
-                      <button className="flex w-full items-center justify-between rounded-3xl border border-[#CACACA] bg-[#CACACA]/20 px-4 py-4 text-left text-sm text-[#989797] transition hover:bg-[#CACACA]/40">
-                        <div>
-                          <p className="font-semibold text-[#683B0D]">Change Password</p>
-                          <p className="mt-1 text-sm text-[#989797]">Update your password</p>
+                    <div className="mt-6 space-y-4">
+                      {[
+                        { label: 'Email', value: user.email, breakAll: true },
+                        { label: 'Phone', value: user.phone ? formatPhone(user.phone) : '' },
+                        { label: 'Location', value: user.location },
+                        { label: 'Member since', value: formatMemberSince(user.createdAt) },
+                      ].map((item) => (
+                        <div key={item.label}>
+                          <p className="text-sm text-[#989797]">{item.label}</p>
+                          {item.value ? (
+                            <p className={`mt-1 text-base font-medium text-[#683B0D] ${item.breakAll ? 'break-all' : ''}`}>{item.value}</p>
+                          ) : (
+                            <p className="mt-1 text-base italic text-[#989797]">Not provided</p>
+                          )}
                         </div>
-                        <span className="text-[#CEA74E]">›</span>
-                      </button>
-                      <button className="flex w-full items-center justify-between rounded-3xl border border-[#CACACA] bg-[#CACACA]/20 px-4 py-4 text-left text-sm text-[#989797] transition hover:bg-[#CACACA]/40">
-                        <div>
-                          <p className="font-semibold text-[#683B0D]">Notification Preferences</p>
-                          <p className="mt-1 text-sm text-[#989797]">Manage how you receive updates</p>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    {/* Edit personal information */}
+                    <form onSubmit={handleProfileSave} noValidate className="rounded-4xl border border-[#CACACA] bg-white p-6 shadow-sm">
+                      <p className="text-sm font-semibold text-[#683B0D]">Personal information</p>
+                      <p className="mt-2 text-sm text-[#989797]">Update how your name and contact details appear.</p>
+
+                      {profileNotice && <div className="mt-4"><Notice tone={profileNotice.tone}>{profileNotice.text}</Notice></div>}
+
+                      <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                        <div className="sm:col-span-2">
+                          <label htmlFor="pf-fullName" className="block text-sm font-semibold text-[#683B0D]">Full name</label>
+                          <input
+                            id="pf-fullName"
+                            type="text"
+                            autoComplete="name"
+                            value={profileDraft.fullName}
+                            onChange={(e) => { setProfileDraft((p) => ({ ...p, fullName: e.target.value })); setProfileErrors((p) => ({ ...p, fullName: undefined })); setProfileNotice(null) }}
+                            aria-invalid={Boolean(profileErrors.fullName)}
+                            aria-describedby={profileErrors.fullName ? 'pf-fullName-error' : undefined}
+                            className={inputClass(profileErrors.fullName)}
+                          />
+                          <FieldError id="pf-fullName-error" message={profileErrors.fullName} />
                         </div>
-                        <span className="text-[#CEA74E]">›</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-               <div className="rounded-4xl border border-[#CACACA] bg-white p-6 shadow-sm">
-                <h3 className="mb-6 text-lg font-semibold text-[#683B0D]">Email Notifications</h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-[#683B0D]">Adoption Updates</p>
-                      <p className="mt-1 text-sm text-[#989797]">Receive updates about matched pets</p>
-                    </div>
-                    <input type="checkbox" defaultChecked className="h-5 w-5" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-[#683B0D]">New Pet Matches</p>
-                      <p className="mt-1 text-sm text-[#989797]">Get notified when new pets match your preferences</p>
-                    </div>
-                    <input type="checkbox" defaultChecked className="h-5 w-5" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-[#683B0D]">Tips & Resources</p>
-                      <p className="mt-1 text-sm text-[#989797]">Receive helpful tips and pet care resources</p>
-                    </div>
-                    <input type="checkbox" className="h-5 w-5" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-[#683B0D]">Marketing & Promotions</p>
-                      <p className="mt-1 text-sm text-[#989797]">Receive news and special offers</p>
-                    </div>
-                    <input type="checkbox" className="h-5 w-5" />
-                  </div>
-                </div>
-              </div>
 
-              <div className="rounded-4xl border border-[#CACACA] bg-white p-6 shadow-sm">
-                <h3 className="mb-6 text-lg font-semibold text-[#683B0D]">Privacy Settings</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block">
-                      <p className="mb-2 text-sm font-semibold text-[#683B0D]">Profile Visibility</p>
-                      <select className="w-full rounded-3xl border border-[#CACACA] bg-white px-4 py-3 text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CEA74E]/40">
-                        <option>Everyone</option>
-                        <option>Only Connected Users</option>
-                        <option>Only Me</option>
-                      </select>
-                    </label>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-[#683B0D]">Show My Email</p>
-                      <p className="mt-1 text-sm text-[#989797]">Allow others to see your email address</p>
-                    </div>
-                    <input type="checkbox" className="h-5 w-5" />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-[#683B0D]">Show My Phone Number</p>
-                      <p className="mt-1 text-sm text-[#989797]">Allow others to see your phone number</p>
-                    </div>
-                    <input type="checkbox" className="h-5 w-5" />
+                        <div className="sm:col-span-2">
+                          <label htmlFor="pf-email" className="block text-sm font-semibold text-[#683B0D]">Email</label>
+                          <input
+                            id="pf-email"
+                            type="email"
+                            value={user.email}
+                            readOnly
+                            className="mt-2 w-full cursor-not-allowed rounded-3xl border border-[#CACACA] bg-[#CACACA]/20 px-4 py-3 text-sm text-[#989797] outline-none"
+                          />
+                          <p className="mt-2 text-xs text-[#989797]">Your email is your login, so it can't be changed here.</p>
+                        </div>
+
+                        <div>
+                          <label htmlFor="pf-phone" className="block text-sm font-semibold text-[#683B0D]">
+                            Mobile number <span className="font-normal text-[#989797]">(optional)</span>
+                          </label>
+                          <input
+                            id="pf-phone"
+                            type="tel"
+                            autoComplete="tel"
+                            value={profileDraft.phone}
+                            onChange={(e) => { setProfileDraft((p) => ({ ...p, phone: e.target.value })); setProfileErrors((p) => ({ ...p, phone: undefined })); setProfileNotice(null) }}
+                            aria-invalid={Boolean(profileErrors.phone)}
+                            aria-describedby={profileErrors.phone ? 'pf-phone-error' : undefined}
+                            placeholder="0917 123 4567"
+                            className={inputClass(profileErrors.phone)}
+                          />
+                          <FieldError id="pf-phone-error" message={profileErrors.phone} />
+                        </div>
+
+                        <div>
+                          <label htmlFor="pf-location" className="block text-sm font-semibold text-[#683B0D]">
+                            Location <span className="font-normal text-[#989797]">(optional)</span>
+                          </label>
+                          <input
+                            id="pf-location"
+                            type="text"
+                            autoComplete="address-level2"
+                            value={profileDraft.location}
+                            onChange={(e) => { setProfileDraft((p) => ({ ...p, location: e.target.value })); setProfileErrors((p) => ({ ...p, location: undefined })); setProfileNotice(null) }}
+                            aria-invalid={Boolean(profileErrors.location)}
+                            aria-describedby={profileErrors.location ? 'pf-location-error' : undefined}
+                            placeholder="City or area"
+                            className={inputClass(profileErrors.location)}
+                          />
+                          <FieldError id="pf-location-error" message={profileErrors.location} />
+                        </div>
+                      </div>
+
+                      <div className="mt-6 flex justify-end">
+                        <button
+                          type="submit"
+                          className="rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
+                        >
+                          Save changes
+                        </button>
+                      </div>
+                    </form>
+
+                    {/* Change password */}
+                    <form onSubmit={handlePasswordSave} noValidate className="rounded-4xl border border-[#CACACA] bg-white p-6 shadow-sm">
+                      <p className="text-sm font-semibold text-[#683B0D]">Change password</p>
+                      <p className="mt-2 text-sm text-[#989797]">Choose a strong password you don't use anywhere else.</p>
+
+                      {passwordNotice && <div className="mt-4"><Notice tone={passwordNotice.tone}>{passwordNotice.text}</Notice></div>}
+
+                      <div className="mt-5 space-y-5">
+                        <div>
+                          <label htmlFor="pw-current" className="block text-sm font-semibold text-[#683B0D]">Current password</label>
+                          <input
+                            id="pw-current"
+                            type={passwordInputType}
+                            autoComplete="current-password"
+                            value={passwordDraft.current}
+                            onChange={(e) => { setPasswordDraft((p) => ({ ...p, current: e.target.value })); setPasswordErrors((p) => ({ ...p, currentPassword: undefined })); setPasswordNotice(null) }}
+                            aria-invalid={Boolean(passwordErrors.currentPassword)}
+                            aria-describedby={passwordErrors.currentPassword ? 'pw-current-error' : undefined}
+                            className={inputClass(passwordErrors.currentPassword)}
+                          />
+                          <FieldError id="pw-current-error" message={passwordErrors.currentPassword} />
+                        </div>
+
+                        <div>
+                          <label htmlFor="pw-new" className="block text-sm font-semibold text-[#683B0D]">New password</label>
+                          <input
+                            id="pw-new"
+                            type={passwordInputType}
+                            autoComplete="new-password"
+                            value={passwordDraft.next}
+                            onChange={(e) => { setPasswordDraft((p) => ({ ...p, next: e.target.value })); setPasswordErrors((p) => ({ ...p, newPassword: undefined })); setPasswordNotice(null) }}
+                            aria-invalid={Boolean(passwordErrors.newPassword)}
+                            aria-describedby="pw-new-rules"
+                            className={inputClass(passwordErrors.newPassword)}
+                          />
+                          <FieldError id="pw-new-error" message={passwordErrors.newPassword} />
+                          <ul id="pw-new-rules" className="mt-3 grid gap-1 text-xs sm:grid-cols-2">
+                            {passwordChecks.map((check) => (
+                              <li key={check.id} className={check.ok ? 'text-green-700' : 'text-[#989797]'}>
+                                <span aria-hidden="true">{check.ok ? '✓' : '○'}</span> {check.label}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div>
+                          <label htmlFor="pw-confirm" className="block text-sm font-semibold text-[#683B0D]">Confirm new password</label>
+                          <input
+                            id="pw-confirm"
+                            type={passwordInputType}
+                            autoComplete="new-password"
+                            value={passwordDraft.confirm}
+                            onChange={(e) => { setPasswordDraft((p) => ({ ...p, confirm: e.target.value })); setPasswordErrors((p) => ({ ...p, confirm: undefined })); setPasswordNotice(null) }}
+                            aria-invalid={Boolean(passwordErrors.confirm)}
+                            aria-describedby={passwordErrors.confirm ? 'pw-confirm-error' : undefined}
+                            className={inputClass(passwordErrors.confirm)}
+                          />
+                          <FieldError id="pw-confirm-error" message={passwordErrors.confirm} />
+                        </div>
+
+                        <label className="flex cursor-pointer items-center gap-2 text-sm text-[#989797]">
+                          <input
+                            type="checkbox"
+                            checked={showPasswords}
+                            onChange={(e) => setShowPasswords(e.target.checked)}
+                            className="h-4 w-4 rounded border-[#CACACA] text-[#683B0D] focus:ring-[#CEA74E]"
+                          />
+                          Show passwords
+                        </label>
+                      </div>
+
+                      <div className="mt-6 flex justify-end">
+                        <button
+                          type="submit"
+                          disabled={savingPassword}
+                          className="rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {savingPassword ? 'Saving…' : 'Change password'}
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 </div>
-              </div>
-
-              <div className="flex justify-end gap-3">
-                <button onClick={onClose} className="rounded-full border border-[#CACACA] bg-white px-6 py-3 text-sm font-semibold text-[#683B0D] transition hover:bg-[#CACACA]/10">
-                  Cancel
-                </button>
-                <button className="rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]">
-                  Save Preferences
-                </button>
-              </div>
+              )}
             </div>
-              
           )}
 
           {activeTab === 'Preferences & Lifestyle' && (
@@ -257,7 +403,7 @@ export default function ProfileModal({ open, onClose }) {
                   <div>
                     <h3 className="text-lg font-semibold text-[#683B0D]">Pet Adoption Preferences & Lifestyle</h3>
                     <p className="mt-2 text-sm text-[#989797]">
-                      These answers help providers match you with the right pet.
+                      Our matching model uses these answers to recommend pets for you.
                     </p>
                   </div>
                   {!isEditingPetPreferences && (
@@ -296,7 +442,7 @@ export default function ProfileModal({ open, onClose }) {
                     <PetPreferencesSummary values={petPreferences} />
                   ) : (
                     <p className="text-sm text-[#989797]">
-                      You haven&apos;t completed your adoption preferences yet. Add them so providers can match you with the right pet.
+                      You haven&apos;t completed your adoption preferences yet. Add them to get recommendations matched to you.
                     </p>
                   )}
                 </div>
