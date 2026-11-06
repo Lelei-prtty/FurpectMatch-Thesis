@@ -28,11 +28,11 @@ export async function createPet(petInfo, user) {
       .single()
     if (error) {
       console.error('Saving pet failed', error)
-      alert("Your account was created, but we couldn't save the pet: " + (listing.message || 'unknown error'))
+      return { ok: false, reason: error.code || 'server', message: error.message }
     }
     return { ok: true, pet: data }
   } catch (error) {
     console.error('Saving pet failed', error)
-    return { ok: false }
+    return { ok: false, reason: 'network' }
   }
 }

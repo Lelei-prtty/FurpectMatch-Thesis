@@ -6,6 +6,7 @@ import { AREA_OPTIONS, COAT_COLORS, getBreedOptions, suggestSize } from '../../D
 
 // Photos are shrunk before uploading (a raw phone photo can be several MB).
 const MAX_PHOTO_SIDE = 800
+const MAX_PHOTOS = 5 // keep in step with MAX_PHOTOS in Data/ProviderSession.jsx
 
 function shrinkImage(file) {
   return new Promise((resolve, reject) => {
@@ -53,7 +54,7 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {}, title, subtitle, subm
   const isEditing = Boolean(initialPet?.id);
   const heading = title ?? (isEditing ? 'Edit pet listing' : 'Add pet for adoption');
   const subheading =
-    subtitle ?? (isEditing ? 'Update the details, description and photo.' : 'Enter the pet details to create a listing.');
+    subtitle ?? (isEditing ? 'Update the details, description and photos.' : 'Enter the pet details to create a listing.');
   const buttonLabel = submitLabel ?? (isEditing ? 'Save changes' : 'Add pet');
   const [pet, setPet] = useState(() => {
     const merged = { ...DEFAULT_PET, ...initialPet };
@@ -62,7 +63,14 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {}, title, subtitle, subm
       merged[field] = merged[field] ?? '';
     });
     merged.size = merged.size || DEFAULT_PET.size;
-    merged.image = merged.image || null;
+    // Photos: a list (up to MAX_PHOTOS). Older listings only have a single `image`.
+    merged.images =
+      Array.isArray(initialPet?.images) && initialPet.images.length
+        ? initialPet.images.slice(0, MAX_PHOTOS)
+        : initialPet?.image
+          ? [initialPet.image]
+          : [];
+    merged.image = merged.images[0] || null;
     return merged;
   });
   const [error, setError] = useState('');
@@ -89,22 +97,39 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {}, title, subtitle, subm
   };
 
   const handleImageUpload = async (event) => {
-    const file = event.target.files?.[0];
+    const files = Array.from(event.target.files || []);
+    event.target.value = ''; // lets the same file be picked again later
 
-    if (!file) return;
+    if (files.length === 0) return;
 
-    if (!file.type.startsWith('image/')) {
-      setError('Please upload a valid image file.');
+    const room = MAX_PHOTOS - pet.images.length;
+    if (room <= 0) {
+      setError(`You can add up to ${MAX_PHOTOS} photos.`);
+      return;
+    }
+    if (files.some((file) => !file.type.startsWith('image/'))) {
+      setError('Please upload valid image files.');
       return;
     }
 
     try {
-      updateField('image', await shrinkImage(file));
-      setError('');
+      const added = await Promise.all(files.slice(0, room).map(shrinkImage));
+      setPet((prev) => ({ ...prev, images: [...prev.images, ...added].slice(0, MAX_PHOTOS) }));
+      setError(files.length > room ? `Only ${MAX_PHOTOS} photos fit, so the extra ones were skipped.` : '');
     } catch (err) {
       setError(err.message);
     }
   };
+
+  const removePhotoAt = (index) =>
+    setPet((prev) => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
+
+  const makeCover = (index) =>
+    setPet((prev) => {
+      const next = [...prev.images];
+      const [chosen] = next.splice(index, 1);
+      return { ...prev, images: [chosen, ...next] };
+    });
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -118,7 +143,8 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {}, title, subtitle, subm
     setError('');
     const result = await onSubmit({
       ...pet,
-      image: pet.image || null,
+      images: pet.images,
+      image: pet.images[0] || null,
       name: pet.name.trim(),
       breed: pet.breed.trim(),
       age: pet.age.trim(),
@@ -167,32 +193,54 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {}, title, subtitle, subm
           )}
           <div className="grid gap-6 sm:grid-cols-[1.1fr_1fr] items-start">
             <div className="space-y-2 text-sm font-semibold text-[#683B0D]">
-              Pet image
+              Pet photos ({pet.images.length} of {MAX_PHOTOS})
               <div className="overflow-hidden rounded-3xl border border-[#CACACA] bg-[#CACACA]/10 p-3">
-                {pet.image && (
-                  <div className="mb-3 overflow-hidden rounded-2xl border border-[#CACACA] bg-[#CACACA]/10">
-                    <img
-                      src={pet.image}
-                      alt="Pet preview"
-                      className="h-40 w-full object-cover"
-                    />
+                {pet.images.length > 0 && (
+                  <div className="mb-3 grid grid-cols-3 gap-2">
+                    {pet.images.map((src, index) => (
+                      <div
+                        key={`${index}-${src.slice(-24)}`}
+                        className="relative overflow-hidden rounded-2xl border border-[#CACACA] bg-white"
+                      >
+                        <img src={src} alt={`Pet photo ${index + 1}`} className="h-24 w-full object-cover" />
+                        {index === 0 && (
+                          <span className="absolute left-1 top-1 rounded-full bg-[#CEA74E] px-2 py-0.5 text-[10px] font-semibold text-white">
+                            Cover
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removePhotoAt(index)}
+                          aria-label={`Remove photo ${index + 1}`}
+                          className="absolute right-1 top-1 rounded-full bg-white/90 p-1 text-red-600 shadow-sm hover:bg-white"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                        {index > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => makeCover(index)}
+                            className="absolute bottom-1 left-1 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-[#683B0D] shadow-sm hover:bg-white"
+                          >
+                            Make cover
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageUpload}
-                  className="block w-full text-sm text-[#683B0D] file:mr-4 file:rounded-full file:border-0 file:bg-[#683B0D] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#CEA74E]"
-                />
-                {pet.image && (
-                  <button
-                    type="button"
-                    onClick={() => updateField('image', null)}
-                    className="mt-3 rounded-full border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-                  >
-                    Remove photo
-                  </button>
+                {pet.images.length < MAX_PHOTOS && (
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                    className="block w-full text-sm text-[#683B0D] file:mr-4 file:rounded-full file:border-0 file:bg-[#683B0D] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-[#CEA74E]"
+                  />
                 )}
+                <p className="mt-2 text-xs font-normal text-[#989797]">
+                  Up to {MAX_PHOTOS} photos. The first one is the cover.
+                </p>
               </div>
             </div>
 
@@ -219,7 +267,9 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {}, title, subtitle, subm
                   <option>Cat</option>
                   <option>Rabbit</option>
                   <option>Bird</option>
-                  <option>Other</option>
+                  <option>Hamster</option>
+                  <option>Guinea Pig</option>
+                  <option>Fish</option>
                 </select>
               </label>
 
@@ -231,7 +281,7 @@ const AddPetModal = ({ onClose, onSubmit, initialPet = {}, title, subtitle, subm
                   onChange={(breed) => updateField('breed', breed)}
                   onPick={handleBreedPick}
                   options={getBreedOptions(pet.species)}
-                  placeholder={pet.species === 'Other' ? 'Type the kind of animal' : 'Search or pick a breed'}
+                  placeholder="Search or pick a breed"
                 />
               </div>
             </div>

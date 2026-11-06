@@ -7,6 +7,7 @@ import PetDetailModal from '../PetGuardian/PetDetailModal.jsx'
 import ProfileSection from '../../components/ProfileSection.jsx'
 import NotificationModal from '../../components/NotificationModal.jsx'
 import PetPhoto from '../../components/PetPhoto.jsx'
+import ModelOutputPanel from '../../components/ModelOutputPanel.jsx'
 import MessagesTab from '../../components/MessagesTab.jsx'
 import ApprovalNoticeModal from '../../components/ApprovalNoticeModal.jsx'
 import {
@@ -28,6 +29,8 @@ import {
   mapRecommendedPet,
 } from '../../api/recommender.js'
 import { getPetPreferences, hasPetPreferences, loadPetPreferences } from '../../Data/Petpreferencesstorage.jsx'
+import { MODEL_SPECIES, preferencesForModel } from '../../Data/Petpreferencesoptions.jsx'
+import { addFavorite, loadFavorites, removeFavorite } from '../../Data/Favorites.jsx'
 import { ALL, filterPets, getFacetOptions, hasActiveFilters } from '../../utils/petFilters.js'
 
 // Small round pet avatar for the applications list. Falls back to the pet's
@@ -62,13 +65,79 @@ const conversations = []
 const adoptionHistory = []
 
 // How many recommended pets to show at once (after search/filters are applied).
-const RECOMMENDED_COUNT = 6
+const RECOMMENDED_COUNT = 6 // how many recommended pets show at first
+const RECOMMENDED_PAGE = 12 // how many more each "Show more" adds
 
 // The API normalizes match % within the guardian's preferred species, so a pet
 // of another species can come back below 0. Clamp so the badge reads 0-100%.
 function toRecommended(apiPet) {
   const pet = mapRecommendedPet(apiPet)
   return { ...pet, matchScore: Math.min(1, Math.max(0, pet.matchScore ?? 0)) }
+}
+
+// One pet card, used for recommendations, browsing and favorites.
+// `score` is 0-1 (shown as "n% match") or null when there is no match score to show.
+function PetCard({ pet, score = null, note = '', highlighted = false, showMeta = false, isLiked, onOpen, onToggleLike }) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(pet)}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') onOpen(pet)
+      }}
+      className={`cursor-pointer overflow-hidden rounded-[32px] bg-white shadow-sm border transition hover:-translate-y-1 hover:shadow-lg ${
+        highlighted ? 'border-[#CEA74E]/60 ring-1 ring-[#CEA74E]/20' : 'border-[#CACACA]'
+      }`}
+    >
+      <div className="relative h-48 overflow-hidden bg-[#CACACA]">
+        <PetPhoto src={pet.image} alt={pet.name} />
+        {score !== null && score !== undefined && (
+          <span className="absolute left-3 top-3 rounded-full bg-[#CEA74E] px-3 py-1 text-xs font-semibold text-white">
+            {Math.round(score * 100)}% match
+          </span>
+        )}
+        {(score === null || score === undefined) && note && (
+          <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-[#683B0D]">
+            {note}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation()
+            onToggleLike(pet)
+          }}
+          className={`group absolute right-3 top-3 rounded-full p-2 shadow-sm transition ${
+            isLiked ? 'bg-[#CEA74E] text-white' : 'bg-white/90 text-[#683B0D] hover:bg-[#CEA74E] hover:text-white'
+          }`}
+          aria-label={isLiked ? 'Remove from favorites' : 'Add to favorites'}
+        >
+          <Heart className={`h-4 w-4 transition group-hover:scale-110 ${isLiked ? 'fill-current' : ''}`} />
+        </button>
+      </div>
+      <div className="p-6">
+        <p className="text-sm font-semibold text-[#989797]">{pet.breed}</p>
+        <h2 className="mt-2 text-2xl font-bold text-[#683B0D]">{pet.name}</h2>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.species}</span>
+          <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.gender}</span>
+          <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.size}</span>
+          <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.age}</span>
+        </div>
+        {showMeta && (pet.area || pet.listedBy) && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {pet.area && (
+              <span className="rounded-full bg-[#683B0D]/10 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.area}</span>
+            )}
+            {pet.listedBy && (
+              <span className="rounded-full bg-[#683B0D]/10 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.listedBy}</span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export default function GuardianDashboard({ openProfileOnMount, openMessageNameOnMount }) {
@@ -85,6 +154,7 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
   const [showProfileModal, setShowProfileModal] = useState(false)
   const [likedPetIds, setLikedPetIds] = useState([])
   const [selectedPet, setSelectedPet] = useState(null)
+  const [recommendedShown, setRecommendedShown] = useState(RECOMMENDED_COUNT)
   // Adoption requests this guardian has sent (saved in this browser; see GuardianSession.jsx)
   const [requests, setRequests] = useState(() => getAdoptionRequests())
   // Chats (one per approved request) and the one-time "approved!" notice
@@ -126,6 +196,32 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
   const pets = useMemo(() => [...providerPets, ...apiPets], [providerPets, apiPets])
   const [petsLoading, setPetsLoading] = useState(true)
   const [petsError, setPetsError] = useState(null)
+
+  // Favorites are saved in Supabase, so they are still there after a refresh or on another device.
+  useEffect(() => {
+    let cancelled = false
+    loadFavorites().then((ids) => {
+      if (!cancelled) setLikedPetIds(ids)
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  // Match percentages. Only pets of the types the guardian chose get one: the model's
+  // percentage is measured against pets of those types, so it means nothing for the rest.
+  // While the guardian has no saved preferences, the recommendations come from a demo
+  // profile, so Browse and Favorites show no percentage (Recommended says so itself).
+  const matchById = useMemo(
+    () => new Map(recommendedPets.map((pet) => [pet.id, pet.matchScore])),
+    [recommendedPets]
+  )
+  const chosenModelSpecies = useMemo(() => {
+    const { chosen } = preferencesForModel(getPetPreferences() || {})
+    return new Set(chosen.map((type) => MODEL_SPECIES[type]).filter(Boolean))
+  }, [recommendedPets, recsSource]) // eslint-disable-line react-hooks/exhaustive-deps
+  const matchFor = (pet) =>
+    recsSource === 'preferences' && chosenModelSpecies.has(pet.species) && matchById.has(pet.id)
+      ? matchById.get(pet.id)
+      : null
 
   // 1) The pet catalogue
   useEffect(() => {
@@ -188,8 +284,16 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
       setRecsNotice('')
       try {
         if (hasPetPreferences()) {
+          const { chosen, answers } = preferencesForModel(getPetPreferences())
+          if (chosen.length > 0 && answers.petTypes.length === 0) {
+            // Only types the model can't score (hamsters, fish...): browse them, without a match score.
+            setRecommendedPets([])
+            setRecsSource('preferences')
+            setRecsNotice('Match scores are available for dogs, cats and birds. You can still browse the pets below.')
+            return
+          }
           try {
-            const data = await getRecommendationsForPreferences(getPetPreferences(), apiPets.length)
+            const data = await getRecommendationsForPreferences(answers, apiPets.length)
             if (cancelled) return
             setRecommendedPets(data.recommendations.map(toRecommended))
             setRecsSource('preferences')
@@ -264,6 +368,7 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
     const headers = {
       'dashboard': { title: 'Browse Pets', desc: 'Find your perfect companion and submit adoption requests in one place.' },
       'applications': { title: 'My Applications', desc: 'Review the adoption applications and next steps.' },
+      'favorites': { title: 'My Favorites', desc: 'Pets you saved so you can look at them again.' },
       'messages': { title: 'My Messages', desc: 'View conversations with pet providers.' },
       'profile': { title: 'My Profile', desc: 'Manage your account details and adoption preferences.' },
       'adoption': { title: 'Adoption History', desc: 'View your pet adoption history and details.' }
@@ -280,17 +385,25 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
   }
 
   const openPetDetail = (pet) => {
-    setSelectedPet(pet)
+    // Attach the match score that matches what the card showed (or none).
+    const { matchScore: _ignored, ...rest } = pet // eslint-disable-line no-unused-vars
+    const score = recsSource === 'preferences' ? matchFor(pet) : pet.matchScore
+    setSelectedPet(score === null || score === undefined ? rest : { ...rest, matchScore: score })
   }
 
   const closePetDetail = () => {
     setSelectedPet(null)
   }
 
-  const toggleLikePet = (pet) => {
-    setLikedPetIds((prev) =>
-      prev.includes(pet.id) ? prev.filter((id) => id !== pet.id) : [...prev, pet.id]
-    )
+  const toggleLikePet = async (pet) => {
+    const wasLiked = likedPetIds.includes(pet.id)
+    // Show the change straight away, then save it; undo it if saving fails.
+    setLikedPetIds((prev) => (wasLiked ? prev.filter((id) => id !== pet.id) : [pet.id, ...prev]))
+    const saved = wasLiked ? await removeFavorite(pet.id) : await addFavorite(pet.id)
+    if (!saved) {
+      setLikedPetIds((prev) => (wasLiked ? [pet.id, ...prev] : prev.filter((id) => id !== pet.id)))
+      alert("We couldn't update your favorites. Please try again.")
+    }
   }
 
   const requestedPetIds = useMemo(() => new Set(requests.map((r) => r.petId)), [requests])
@@ -338,6 +451,7 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
 
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
+    { id: 'favorites', label: 'Favorites', icon: Heart },
     { id: 'applications', label: 'My Applications', icon: Users },
     { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadMessages || undefined },
   ]
@@ -364,13 +478,40 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
   )
   const filtersActive = hasActiveFilters(filters)
 
+  // Favorite pets that are still listed (a pet that was removed simply drops out).
+  const favoritePets = useMemo(() => {
+    const liked = new Set(likedPetIds)
+    return pets.filter((pet) => liked.has(pet.id))
+  }, [pets, likedPetIds])
+
   // Recommendations respect the same search + filters. The model's ranking is
   // kept (best match first) even while searching; we then show the top few.
   const matchingRecommended = useMemo(() => {
     const rank = new Map(recommendedPets.map((pet, i) => [pet.id, i]))
     return filterPets(recommendedPets, filters).sort((a, b) => rank.get(a.id) - rank.get(b.id))
   }, [recommendedPets, petSearch, selectedSpecies, selectedSize, selectedAge]) // eslint-disable-line react-hooks/exhaustive-deps
-  const visibleRecommended = matchingRecommended.slice(0, RECOMMENDED_COUNT)
+  // One ranking for every recommended pet, best match first. Pets of the types the guardian chose
+  // come first, ordered by match percentage (so a dog and a cat are mixed by how well each fits).
+  // Pets of other types follow in the model's own order (its raw score), so even a different
+  // animal appears in order from the closest to the furthest match.
+  const recommendedScore = (pet) => {
+    if (recsSource === 'preferences') return matchFor(pet)
+    return typeof pet.matchScore === 'number' && pet.matchScore > 0 ? pet.matchScore : null
+  }
+  const rankedRecommended = [...matchingRecommended].sort((a, b) => {
+    const scoreA = recommendedScore(a)
+    const scoreB = recommendedScore(b)
+    if (scoreA !== null && scoreB !== null) return scoreB - scoreA // ties keep the model's order
+    if (scoreA !== null) return -1
+    if (scoreB !== null) return 1
+    return 0 // both are other types: keep the model's order
+  })
+  const visibleRecommended = rankedRecommended.slice(0, recommendedShown)
+
+  // A new search, filter or set of preferences starts again at the top few.
+  useEffect(() => {
+    setRecommendedShown(RECOMMENDED_COUNT)
+  }, [petSearch, selectedSpecies, selectedSize, selectedAge, recsSource])
 
   const clearFilters = () => {
     setPetSearch('')
@@ -515,7 +656,17 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
                 <div className="rounded-3xl bg-white p-6 shadow-sm border border-[#CACACA]">
                   <p className="text-sm font-semibold text-[#989797]">Favorites</p>
                   <p className="mt-4 text-3xl font-bold text-[#683B0D]">{likedPetIds.length}</p>
-                  <p className="mt-2 text-sm text-[#989797]">Keep track of pets you love.</p>
+                  <p className="mt-2 text-sm text-[#989797]">
+                    {likedPetIds.length === 0 ? 'Keep track of pets you love.' : (
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('favorites')}
+                        className="font-semibold text-[#683B0D] underline decoration-[#CEA74E] underline-offset-4 hover:text-[#CEA74E]"
+                      >
+                        View your favorites
+                      </button>
+                    )}
+                  </p>
                 </div>
                 <div className="rounded-3xl bg-white p-6 shadow-sm border border-[#CACACA]">
                   <p className="text-sm font-semibold text-[#989797]">Requests sent</p>
@@ -528,12 +679,26 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
                 </div>
               </div>
 
+              <ModelOutputPanel
+                preferences={getPetPreferences()}
+                recommendedPets={recommendedPets}
+                recsSource={recsSource}
+                loading={recsLoading}
+                error={recsError}
+                notice={recsNotice}
+                onOpenPet={openPetDetail}
+                onSetPreferences={() => {
+                  setProfileModalTab('Preferences & Lifestyle')
+                  setShowProfileModal(true)
+                }}
+              />
+
               <div>
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-semibold text-[#683B0D]">Recommended for You</h2>
                   <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#989797]">
                     {filtersActive && !recsLoading && !recsError && recommendedPets.length > 0
-                      ? `Top ${visibleRecommended.length} of ${matchingRecommended.length} matching`
+                      ? `Showing ${visibleRecommended.length} of ${rankedRecommended.length} matching`
                       : recsSource === 'preferences'
                         ? 'Matched to your preferences'
                         : `Matching model · demo profile ${demoGuardianId}`}
@@ -564,7 +729,7 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
                 {!recsLoading && !recsError && recommendedPets.length === 0 && (
                   <p className="mt-4 text-sm text-[#989797]">{recsNotice || 'No recommendations available right now.'}</p>
                 )}
-                {!recsLoading && !recsError && recommendedPets.length > 0 && visibleRecommended.length === 0 && (
+                {!recsLoading && !recsError && recommendedPets.length > 0 && filtersActive && visibleRecommended.length === 0 && (
                   <div className="mt-4 rounded-3xl border border-[#CACACA] bg-[#CACACA]/10 p-8 text-center">
                     <p className="text-sm text-[#989797]">None of your recommended pets match this search or these filters.</p>
                     <button
@@ -577,53 +742,58 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
                   </div>
                 )}
                 {!recsLoading && !recsError && visibleRecommended.length > 0 && (
+                  <>
                   <div className="mt-4 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                    {visibleRecommended.map((pet) => {
-                      const isLiked = likedPetIds.includes(pet.id)
-                      return (
-                        <div
-                          key={pet.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => openPetDetail(pet)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') openPetDetail(pet)
-                          }}
-                          className="cursor-pointer overflow-hidden rounded-[32px] bg-white shadow-sm border border-[#CEA74E]/60 ring-1 ring-[#CEA74E]/20 transition hover:-translate-y-1 hover:shadow-lg"
-                        >
-                          <div className="relative h-48 overflow-hidden bg-[#CACACA]">
-                            <PetPhoto src={pet.image} alt={pet.name} />
-                            <span className="absolute left-3 top-3 rounded-full bg-[#CEA74E] px-3 py-1 text-xs font-semibold text-white">
-                              {Math.round(pet.matchScore * 100)}% match
-                            </span>
+                    {visibleRecommended.map((pet) => (
+                      <PetCard
+                        key={pet.id}
+                        pet={pet}
+                        highlighted
+                        score={recommendedScore(pet)}
+                        note="Different type"
+                        isLiked={likedPetIds.includes(pet.id)}
+                        onOpen={openPetDetail}
+                        onToggleLike={toggleLikePet}
+                      />
+                    ))}
+                  </div>
+                  {rankedRecommended.length > RECOMMENDED_COUNT && (
+                    <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm text-[#989797]">
+                        Showing {visibleRecommended.length} of {rankedRecommended.length} recommended pets, best match first.
+                      </p>
+                      <div className="flex flex-wrap gap-3">
+                        {visibleRecommended.length < rankedRecommended.length && (
+                          <>
                             <button
                               type="button"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                toggleLikePet(pet)
-                              }}
-                              className={`group absolute right-3 top-3 rounded-full p-2 shadow-sm transition ${
-                                isLiked ? 'bg-[#CEA74E] text-white' : 'bg-white/90 text-[#683B0D] hover:bg-[#CEA74E] hover:text-white'
-                              }`}
-                              aria-label={isLiked ? 'Remove from favorites' : 'Add to favorites'}
+                              onClick={() => setRecommendedShown((count) => count + RECOMMENDED_PAGE)}
+                              className="rounded-full bg-[#683B0D] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
                             >
-                              <Heart className={`h-4 w-4 transition group-hover:scale-110 ${isLiked ? 'fill-current' : ''}`} />
+                              Show {Math.min(RECOMMENDED_PAGE, rankedRecommended.length - visibleRecommended.length)} more
                             </button>
-                          </div>
-                          <div className="p-6">
-                            <p className="text-sm font-semibold text-[#989797]">{pet.breed}</p>
-                            <h2 className="mt-2 text-2xl font-bold text-[#683B0D]">{pet.name}</h2>
-                            <div className="mt-4 flex flex-wrap gap-2">
-                              <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.species}</span>
-                              <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.gender}</span>
-                              <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.size}</span>
-                              <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.age}</span>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
+                            <button
+                              type="button"
+                              onClick={() => setRecommendedShown(rankedRecommended.length)}
+                              className="rounded-full border border-[#CACACA] bg-white px-5 py-2 text-sm font-semibold text-[#683B0D] transition hover:border-[#683B0D]"
+                            >
+                              View all {rankedRecommended.length}
+                            </button>
+                          </>
+                        )}
+                        {recommendedShown > RECOMMENDED_COUNT && (
+                          <button
+                            type="button"
+                            onClick={() => setRecommendedShown(RECOMMENDED_COUNT)}
+                            className="rounded-full border border-[#CACACA] bg-white px-5 py-2 text-sm font-semibold text-[#683B0D] transition hover:border-[#683B0D]"
+                          >
+                            Show top {RECOMMENDED_COUNT} only
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  </>
                 )}
               </div>
 
@@ -649,6 +819,12 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
                     </div>
                   )}
                 </div>
+                {recsSource === 'preferences' && matchById.size > 0 && (
+                  <p className="mt-2 text-sm text-[#989797]">
+                    Match percentages compare pets of the types you chose with each other, so the best match is always
+                    100%. Pets without a percentage are other types, or new listings the model hasn’t scored yet.
+                  </p>
+                )}
                 {petsLoading && (
                   <p className="mt-4 text-sm text-[#989797]">Loading pets...</p>
                 )}
@@ -671,63 +847,60 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
                 )}
               </div>
               <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-                {!petsLoading && !petsError && filteredPets.map((pet) => {
-                  const isLiked = likedPetIds.includes(pet.id)
-                  return (
-                    <div
-                      key={pet.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => openPetDetail(pet)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') openPetDetail(pet)
-                      }}
-                      className="cursor-pointer overflow-hidden rounded-[32px] bg-white shadow-sm border border-[#CACACA] transition hover:-translate-y-1 hover:shadow-lg"
-                    >
-                      <div className="relative h-48 overflow-hidden bg-[#CACACA]">
-                        <PetPhoto src={pet.image} alt={pet.name} />
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            toggleLikePet(pet)
-                          }}
-                          className={`group absolute right-3 top-3 rounded-full p-2 shadow-sm transition ${
-                            isLiked ? 'bg-[#CEA74E] text-white' : 'bg-white/90 text-[#683B0D] hover:bg-[#CEA74E] hover:text-white'
-                          }`}
-                          aria-label={isLiked ? 'Remove from favorites' : 'Add to favorites'}
-                        >
-                          <Heart className={`h-4 w-4 transition group-hover:scale-110 ${isLiked ? 'fill-current' : ''}`} />
-                        </button>
-                      </div>
-                      <div className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-semibold text-[#989797]">{pet.breed}</p>
-                            <h2 className="mt-2 text-2xl font-bold text-[#683B0D]">{pet.name}</h2>
-                          </div>
-                        </div>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.species}</span>
-                          <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.gender}</span>
-                          <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.size}</span>
-                          <span className="rounded-full bg-[#CACACA]/30 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.age}</span>
-                        </div>
-                        {(pet.area || pet.listedBy) && (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            {pet.area && (
-                              <span className="rounded-full bg-[#683B0D]/10 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.area}</span>
-                            )}
-                            {pet.listedBy && (
-                              <span className="rounded-full bg-[#683B0D]/10 px-3 py-1 text-xs font-semibold text-[#683B0D]">{pet.listedBy}</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
+                {!petsLoading && !petsError && filteredPets.map((pet) => (
+                  <PetCard
+                    key={pet.id}
+                    pet={pet}
+                    showMeta
+                    score={matchFor(pet)}
+                    isLiked={likedPetIds.includes(pet.id)}
+                    onOpen={openPetDetail}
+                    onToggleLike={toggleLikePet}
+                  />
+                ))}
               </div>
+            </section>
+          )}
+
+          {activeTab === 'favorites' && (
+            <section className="space-y-6">
+              {favoritePets.length === 0 ? (
+                <div className="rounded-3xl border border-[#CACACA] bg-[#CACACA]/10 p-10 text-center">
+                  <p className="text-lg font-semibold text-[#683B0D]">No favorites yet</p>
+                  <p className="mt-2 text-sm text-[#989797]">
+                    Tap the heart on a pet to save it here, so you can come back to it later.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('dashboard')}
+                    className="mt-5 rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
+                  >
+                    Browse pets
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-[#989797]">
+                    {favoritePets.length} saved {favoritePets.length === 1 ? 'pet' : 'pets'}
+                    {likedPetIds.length > favoritePets.length
+                      ? ` (${likedPetIds.length - favoritePets.length} no longer listed)`
+                      : ''}
+                  </p>
+                  <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    {favoritePets.map((pet) => (
+                      <PetCard
+                        key={pet.id}
+                        pet={pet}
+                        showMeta
+                        score={matchFor(pet)}
+                        isLiked
+                        onOpen={openPetDetail}
+                        onToggleLike={toggleLikePet}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </section>
           )}
 

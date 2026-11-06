@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import PetPreferencesForm from '../../components/Petpreferencesform.jsx'
-import { DEFAULT_PET_PREFERENCES } from '../../Data/Petpreferencesoptions.jsx'
+import TopMatchesModal from '../../components/TopMatchesModal.jsx'
+import { DEFAULT_PET_PREFERENCES, withPetTypes } from '../../Data/Petpreferencesoptions.jsx'
 import { savePetPreferences } from '../../Data/Petpreferencesstorage.jsx'
 import {
   createAccount,
@@ -10,12 +11,13 @@ import {
   startSession,
   validateConfirmPassword,
   validateEmail,
-  validateFullName,
   validatePassword,
+  validateNamePart,
   validatePhone,
+  TERMS_VERSION,
 } from '../../Data/Accounts.jsx'
 
-const FIELD_ORDER = ['fullName', 'email', 'phone', 'password', 'confirmPassword']
+const FIELD_ORDER = ['firstName', 'lastName', 'email', 'phone', 'password', 'confirmPassword', 'terms']
 
 const inputClass = (hasError, extra = '') =>
   `mt-2 w-full rounded-3xl border bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:ring-2 ${extra} ${
@@ -68,13 +70,15 @@ export default function GuardianRegister() {
   const navigate = useNavigate()
 
   // Step 1 — account details
-  const [fullName, setFullName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
 
   // Validation display: a field's error shows once it's been touched (left) or
   // after the person tries to continue.
@@ -91,29 +95,41 @@ export default function GuardianRegister() {
   const [activeTab, setActiveTab] = useState('account') // 'account' | 'preferences'
   const [accountCompleted, setAccountCompleted] = useState(false)
 
+  // Set once the account and preferences are saved: shows the top matches before the dashboard.
+  const [matches, setMatches] = useState(null) // { preferences, saveFailed }
+
   const handlePreferenceChange = (field, value) => {
     setPreferences((prev) => ({ ...prev, [field]: value }))
   }
 
+  // The database also keeps a combined name, so everything that shows full_name keeps working.
+  const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
   const emailTaken = !validateEmail(email) && isEmailTaken(email)
   const errors = {
-    fullName: validateFullName(fullName),
+    firstName: validateNamePart(firstName, 'first name'),
+    lastName: validateNamePart(lastName, 'last name'),
     email: validateEmail(email) || (emailTaken ? 'taken' : ''),
     phone: validatePhone(phone),
     password: validatePassword(password, { email, fullName }),
     confirmPassword: validateConfirmPassword(password, confirmPassword),
+    terms: termsAccepted ? '' : 'Please accept the Terms and Conditions to continue.',
   }
   const passwordChecks = getPasswordChecks(password, { email, fullName })
 
   const errorFor = (field) =>
-    serverErrors[field] || ((touched[field] || submitAttempted) ? errors[field] : '')
+    serverErrors[field] ||
+    (field === 'firstName' ? serverErrors.fullName : '') ||
+    ((touched[field] || submitAttempted) ? errors[field] : '')
 
   const touch = (field) => setTouched((prev) => ({ ...prev, [field]: true }))
 
   // Typing in a field clears any error that came back from saving for that field.
   const setField = (field, setter) => (event) => {
     setter(event.target.value)
-    if (serverErrors[field]) setServerErrors((prev) => ({ ...prev, [field]: undefined }))
+    const clearsFullName = (field === 'firstName' || field === 'lastName') && serverErrors.fullName
+    if (serverErrors[field] || clearsFullName) {
+      setServerErrors((prev) => ({ ...prev, [field]: undefined, ...(clearsFullName ? { fullName: undefined } : {}) }))
+    }
     if (submitError) setSubmitError('')
   }
 
@@ -148,10 +164,19 @@ export default function GuardianRegister() {
   const finishRegistration = async (savePreferences) => {
     setSubmitting(true)
     setSubmitError('')
-    const result = await createAccount({ fullName, email, phone, password })
-    setSubmitting(false)
+    const result = await createAccount({
+      fullName,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email,
+      phone,
+      password,
+      termsAccepted: true,
+      termsVersion: TERMS_VERSION,
+    })
 
     if (!result.ok) {
+      setSubmitting(false)
       if (result.errors) {
         setServerErrors(result.errors)
         setSubmitAttempted(true)
@@ -164,7 +189,17 @@ export default function GuardianRegister() {
     }
 
     startSession(result.user, true)
-    if (savePreferences) savePetPreferences(preferences, result.user.id)
+    if (savePreferences) {
+      const prepared = withPetTypes(preferences)
+      // Wait for the save: the dashboard reads the saved preferences as soon as it opens,
+      // and would otherwise fall back to the demo profile.
+      const saved = await savePetPreferences(prepared, result.user.id)
+      if (prepared.petTypes.length > 0) {
+        setSubmitting(false)
+        setMatches({ preferences: prepared, saveFailed: !saved })
+        return
+      }
+    }
     navigate('/guardian/dashboard', { replace: true })
   }
 
@@ -286,20 +321,37 @@ export default function GuardianRegister() {
                     </div>
                   )}
 
-                  <Field id="reg-fullName" label="Full Name" error={errorFor('fullName')}>
-                    <input
-                      id="reg-fullName"
-                      type="text"
-                      autoComplete="name"
-                      value={fullName}
-                      onChange={setField('fullName', setFullName)}
-                      onBlur={() => touch('fullName')}
-                      aria-invalid={Boolean(errorFor('fullName'))}
-                      aria-describedby={errorFor('fullName') ? 'reg-fullName-error' : undefined}
-                      placeholder="Your full name"
-                      className={inputClass(errorFor('fullName'))}
-                    />
-                  </Field>
+                  <div className="grid gap-6 sm:grid-cols-2">
+                    <Field id="reg-firstName" label="First Name" error={errorFor('firstName')}>
+                      <input
+                        id="reg-firstName"
+                        type="text"
+                        autoComplete="given-name"
+                        value={firstName}
+                        onChange={setField('firstName', setFirstName)}
+                        onBlur={() => touch('firstName')}
+                        aria-invalid={Boolean(errorFor('firstName'))}
+                        aria-describedby={errorFor('firstName') ? 'reg-firstName-error' : undefined}
+                        placeholder="Maria"
+                        className={inputClass(errorFor('firstName'))}
+                      />
+                    </Field>
+
+                    <Field id="reg-lastName" label="Last Name" error={errorFor('lastName')}>
+                      <input
+                        id="reg-lastName"
+                        type="text"
+                        autoComplete="family-name"
+                        value={lastName}
+                        onChange={setField('lastName', setLastName)}
+                        onBlur={() => touch('lastName')}
+                        aria-invalid={Boolean(errorFor('lastName'))}
+                        aria-describedby={errorFor('lastName') ? 'reg-lastName-error' : undefined}
+                        placeholder="Santos"
+                        className={inputClass(errorFor('lastName'))}
+                      />
+                    </Field>
+                  </div>
 
                   <Field id="reg-email" label="Email" error={emailMessage()}>
                     <input
@@ -380,6 +432,38 @@ export default function GuardianRegister() {
                     </div>
                   </Field>
 
+                  <div>
+                    <label htmlFor="reg-terms" className="flex items-start gap-3 text-sm text-[#683B0D]">
+                      <input
+                        id="reg-terms"
+                        type="checkbox"
+                        checked={termsAccepted}
+                        onChange={(event) => {
+                          setTermsAccepted(event.target.checked)
+                          if (submitError) setSubmitError('')
+                        }}
+                        aria-invalid={Boolean(errorFor('terms'))}
+                        aria-describedby={errorFor('terms') ? 'reg-terms-error' : undefined}
+                        className="mt-0.5 h-4 w-4 rounded border-[#CACACA] text-[#683B0D] focus:ring-[#CEA74E]"
+                      />
+                      <span>
+                        I have read and agree to the{' '}
+                        <Link
+                          to="/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold underline hover:text-[#CEA74E]"
+                        >
+                          Terms and Conditions
+                        </Link>
+                        .
+                      </span>
+                    </label>
+                    {errorFor('terms') && (
+                      <p id="reg-terms-error" role="alert" className="mt-2 text-xs font-medium text-red-600">{errorFor('terms')}</p>
+                    )}
+                  </div>
+
                   <button
                     type="submit"
                     className="w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
@@ -433,6 +517,14 @@ export default function GuardianRegister() {
           </div>
         </div>
       </div>
+      {matches && (
+        <TopMatchesModal
+          preferences={matches.preferences}
+          saveFailed={matches.saveFailed}
+          firstName={firstName.trim()}
+          onContinue={() => navigate('/guardian/dashboard', { replace: true })}
+        />
+      )}
     </div>
   )
 }

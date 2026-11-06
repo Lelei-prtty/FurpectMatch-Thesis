@@ -16,6 +16,7 @@ import { supabase } from '../lib/supabaseClient.js'
 // ---------------------------------------------------------------------------
 
 const PHOTO_BUCKET = 'pet-photos'
+export const MAX_PHOTOS = 5 // photos per listing (the first one is the cover)
 
 export const LISTING_STATUSES = ['Available', 'Pending', 'Adopted']
 export const REQUEST_STATUSES = ['Pending', 'Under Review', 'Approved', 'Declined']
@@ -24,7 +25,7 @@ export const REQUEST_STATUSES = ['Pending', 'Under Review', 'Approved', 'Decline
 const LISTING_FIELDS = [
   'name', 'species', 'breed', 'age', 'gender', 'size', 'color',
   'vaccinated', 'spayedNeutered', 'houseTrained', 'goodWithKids', 'goodWithPets',
-  'description', 'specialNeeds', 'image', 'area', 'status',
+  'description', 'specialNeeds', 'image', 'images', 'area', 'status',
 ]
 
 // UI field -> `pets` column
@@ -82,12 +83,46 @@ async function uploadPhoto(dataUrl, providerId) {
   return path
 }
 
-/** undefined = leave the photo alone, null = remove it, string = a new storage path. */
-async function resolvePhoto(image, providerId) {
-  if (image === undefined) return undefined
-  if (image === null || image === '') return null
-  if (typeof image === 'string' && image.startsWith('data:')) return uploadPhoto(image, providerId)
-  return undefined // already a URL: unchanged
+/**
+ * The photos the form sent, as a list: `images` (several) or the older single `image`.
+ * undefined = leave the photos alone, [] = remove them all.
+ */
+function imagesFrom(fields) {
+  if (fields.images !== undefined) return Array.isArray(fields.images) ? fields.images : []
+  if (fields.image !== undefined) return fields.image ? [fields.image] : []
+  return undefined
+}
+
+/**
+ * Turns the form's photo list into storage paths (at most MAX_PHOTOS):
+ *  - a "data:" photo is new, so it is uploaded
+ *  - a URL this app already stored is mapped back to its path and kept
+ *  - any other link (for example a photo that came with the dataset) is kept as it is
+ * Resolves { paths, uploaded }. `uploaded` lists only the files uploaded just now, so a
+ * failed save can delete them again.
+ */
+async function resolvePhotos(images, providerId, existingPaths = []) {
+  const known = new Map(existingPaths.map((path) => [photoUrl(path), path]))
+  const paths = []
+  const uploaded = []
+  try {
+    for (const src of images.slice(0, MAX_PHOTOS)) {
+      if (typeof src !== 'string' || !src) continue
+      if (src.startsWith('data:')) {
+        const path = await uploadPhoto(src, providerId)
+        uploaded.push(path)
+        paths.push(path)
+      } else if (known.has(src)) {
+        paths.push(known.get(src))
+      } else if (/^https?:\/\//i.test(src)) {
+        paths.push(src)
+      }
+    }
+  } catch (error) {
+    await Promise.all(uploaded.map(removePhoto))
+    throw error
+  }
+  return { paths, uploaded }
 }
 
 async function removePhoto(path) {
@@ -118,6 +153,9 @@ function toRow(fields) {
 }
 
 function fromRow(row) {
+  // Several photos live in photo_paths; older rows only have photo_path.
+  const photoPaths =
+    Array.isArray(row.photo_paths) && row.photo_paths.length ? row.photo_paths : row.photo_path ? [row.photo_path] : []
   const listing = {
     id: row.id,
     providerId: row.provider_id,
@@ -136,8 +174,10 @@ function fromRow(row) {
     goodWithPets: Boolean(row.good_with_pets),
     description: row.description ?? '',
     specialNeeds: row.special_needs ?? '',
-    image: photoUrl(row.photo_path),
-    photoPath: row.photo_path ?? null,
+    images: photoPaths.map(photoUrl).filter(Boolean),
+    image: photoPaths.length ? photoUrl(photoPaths[0]) : null,
+    photoPath: photoPaths[0] ?? null,
+    photoPaths,
     area: row.area ?? null,
     status: row.status,
     createdAt: row.created_at,
@@ -193,12 +233,18 @@ export async function addListing(data, user = getCurrentUser()) {
   if (row.status === 'Available') delete row.status // let the database default apply
   if (row.area === undefined || row.area === null) row.area = user.location || null
 
-  let photoPath = null
-  try {
-    photoPath = (await resolvePhoto(fields.image, user.id)) ?? null
-  } catch (error) {
-    console.error('Photo upload failed', error)
-    return { ok: false, reason: 'photo' }
+  let photoPaths = []
+  let uploaded = []
+  const images = imagesFrom(fields)
+  if (images && images.length > 0) {
+    try {
+      const resolved = await resolvePhotos(images, user.id)
+      photoPaths = resolved.paths
+      uploaded = resolved.uploaded
+    } catch (error) {
+      console.error('Photo upload failed', error)
+      return { ok: false, reason: 'photo' }
+    }
   }
 
   try {
@@ -209,13 +255,14 @@ export async function addListing(data, user = getCurrentUser()) {
         provider_id: user.id,
         provider_name: user.fullName, // snapshot, shown to guardians as "Listed by"
         source: 'provider',
-        photo_path: photoPath,
+        photo_path: photoPaths[0] ?? null,
+        photo_paths: photoPaths,
       })
       .select()
       .single()
     if (error || !saved) {
       console.error('Saving listing failed', error)
-      await removePhoto(photoPath)
+      await Promise.all(uploaded.map(removePhoto))
       return { ok: false, reason: 'server' }
     }
     const listing = fromRow(saved)
@@ -223,7 +270,7 @@ export async function addListing(data, user = getCurrentUser()) {
     return { ok: true, listing }
   } catch (error) {
     console.error('Saving listing failed', error)
-    await removePhoto(photoPath)
+    await Promise.all(uploaded.map(removePhoto))
     return { ok: false, reason: 'server' }
   }
 }
@@ -244,17 +291,20 @@ export async function updateListing(listingId, changes, providerId = ownerIdOf()
   const fields = pickFields(changes)
   const patch = toRow(fields)
 
-  let newPath
-  try {
-    newPath = await resolvePhoto(fields.image, providerId)
-  } catch (error) {
-    console.error('Photo upload failed', error)
-    return { ok: false, reason: 'photo' }
+  const previousPaths = myListings.find((l) => l.id === listingId)?.photoPaths || []
+  let photoResult = null
+  const images = imagesFrom(fields)
+  if (images !== undefined) {
+    try {
+      photoResult = await resolvePhotos(images, providerId, previousPaths)
+    } catch (error) {
+      console.error('Photo upload failed', error)
+      return { ok: false, reason: 'photo' }
+    }
+    patch.photo_paths = photoResult.paths
+    patch.photo_path = photoResult.paths[0] ?? null
   }
-  if (newPath !== undefined) patch.photo_path = newPath
   patch.updated_at = new Date().toISOString()
-
-  const previousPath = myListings.find((l) => l.id === listingId)?.photoPath
 
   try {
     const { data, error } = await supabase
@@ -266,12 +316,19 @@ export async function updateListing(listingId, changes, providerId = ownerIdOf()
       .maybeSingle()
     if (error) {
       console.error('Updating listing failed', error)
-      if (newPath) await removePhoto(newPath)
+      if (photoResult) await Promise.all(photoResult.uploaded.map(removePhoto))
       return { ok: false, reason: 'server' }
     }
-    if (!data) return { ok: false, reason: 'missing' }
+    if (!data) {
+      if (photoResult) await Promise.all(photoResult.uploaded.map(removePhoto))
+      return { ok: false, reason: 'missing' }
+    }
 
-    if (newPath !== undefined && previousPath && previousPath !== newPath) await removePhoto(previousPath)
+    // Delete the files that are no longer part of the listing.
+    if (photoResult) {
+      const kept = new Set(photoResult.paths)
+      await Promise.all(previousPaths.filter((path) => !kept.has(path)).map(removePhoto))
+    }
     const listing = fromRow(data)
     myListings = myListings.map((l) => (l.id === listing.id ? listing : l))
     return { ok: true, listing }
@@ -284,7 +341,7 @@ export async function updateListing(listingId, changes, providerId = ownerIdOf()
 /** Deletes one of this provider's listings. Resolves true if something was removed. */
 export async function removeListing(listingId, providerId = ownerIdOf()) {
   if (!providerId) return false
-  const previousPath = myListings.find((l) => l.id === listingId)?.photoPath
+  const previousPaths = myListings.find((l) => l.id === listingId)?.photoPaths || []
   try {
     const { data, error } = await supabase
       .from('pets')
@@ -298,7 +355,7 @@ export async function removeListing(listingId, providerId = ownerIdOf()) {
     }
     if (!data || data.length === 0) return false
     myListings = myListings.filter((l) => l.id !== listingId)
-    await removePhoto(previousPath)
+    await Promise.all(previousPaths.map(removePhoto))
     return true
   } catch (error) {
     console.error('Removing listing failed', error)
@@ -344,6 +401,7 @@ export function getPublicListings() {
       gender: l.gender,
       size: l.size,
       image: l.image || null,
+      images: l.images || [],
       area: l.area || null,
       listedBy: l.providerName || null,
       temperament: l.description || null,
@@ -416,3 +474,4 @@ export async function updateApplicationStatus(requestId, status, providerId = ow
     return { ok: false, reason: 'server' }
   }
 }
+  

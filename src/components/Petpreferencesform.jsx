@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import ToggleYesNo from './Toggleyesno'
 import ScaleSelector from './Scaleselector'
 import SearchSelect from './SearchSelect.jsx'
@@ -6,6 +6,9 @@ import { NO_PREFERENCE, getPreferenceBreedOptions } from '../Data/Petbreeds.jsx'
 import {
   METRO_MANILA_AREAS,
   PET_TYPES,
+  MAX_PET_TYPES,
+  normalizePetTypes,
+  normalizeBreedPreferences,
   AGE_RANGE_OPTIONS,
   PET_SIZE_OPTIONS,
   PET_SEX_OPTIONS,
@@ -25,18 +28,37 @@ export default function PetPreferencesForm({ values, onFieldChange }) {
   const set = (field) => (event) => onFieldChange(field, event.target.value)
   const setValue = (field) => (value) => onFieldChange(field, value)
 
-  // The breed question depends on the type of pet. If the person switches to a different
-  // type, a breed picked for the old type no longer applies, so clear it.
-  const breedOptions = getPreferenceBreedOptions(values.petType)
-  const previousPetType = useRef(values.petType)
-  useEffect(() => {
-    const before = previousPetType.current
-    previousPetType.current = values.petType
-    if (!before || before === values.petType) return // first load, or no real change
-    const breed = (values.breedPreference || '').trim().toLowerCase()
-    const stillValid = !breed || breedOptions.some((option) => option.toLowerCase() === breed)
-    if (!stillValid) onFieldChange('breedPreference', '')
-  }, [values.petType]) // eslint-disable-line react-hooks/exhaustive-deps
+  // Pet types: the person picks 1 or 2. `petTypes` holds the list; `petType` and
+  // `breedPreference` (the first type and its breed) are filled in when the answers are saved.
+  const selectedTypes = normalizePetTypes(values)
+  const breedPrefs = normalizeBreedPreferences(values, selectedTypes)
+  const typesRef = useRef(null)
+
+  const togglePetType = (type) => {
+    // Clear any "choose at least one" message so the form can be submitted again.
+    typesRef.current?.querySelectorAll('input[type="checkbox"]').forEach((input) => input.setCustomValidity(''))
+    const has = selectedTypes.includes(type)
+    const next = has ? selectedTypes.filter((item) => item !== type) : [...selectedTypes, type]
+    if (next.length > MAX_PET_TYPES) return
+    onFieldChange('petTypes', next)
+  }
+
+  // One breed question per chosen type, so a Dog + Cat guardian can pick a dog breed and a cat
+  // breed. A type that is un-ticked drops its breed (see normalizeBreedPreferences).
+  const setBreedFor = (type) => (breed) => {
+    const next = { ...breedPrefs }
+    if (breed && breed.trim()) next[type] = breed
+    else delete next[type]
+    onFieldChange('breedPreferences', next)
+  }
+
+  const breedLabel = (type) => {
+    if (type === 'Dog') return 'What dog breed do you prefer?'
+    if (type === 'Cat') return 'What cat breed do you prefer?'
+    if (type === 'Rabbit') return 'What rabbit breed do you prefer?'
+    if (type === 'Birds / Parakeet') return 'What kind of bird do you prefer?'
+    return `What ${type.toLowerCase()} breed do you prefer?`
+  }
 
   return (
     <div className="space-y-6">
@@ -94,28 +116,72 @@ export default function PetPreferencesForm({ values, onFieldChange }) {
       <div className={sectionClasses}>
         <p className={sectionLabelClasses}>Pet Preferences</p>
         <div className="mt-4 grid gap-5 sm:grid-cols-2">
-          <label className="block text-sm font-semibold text-[#683B0D]">
-            What type of pet are you looking forward to adopt?
-            <select className={selectClasses} value={values.petType} onChange={set('petType')}>
-              <option value="">Select pet type</option>
-              {PET_TYPES.map((opt) => (
-                <option key={opt} value={opt}>{opt}</option>
-              ))}
-            </select>
-          </label>
-          <div className="block text-sm font-semibold text-[#683B0D]">
-            <label htmlFor="pref-breed">What breed do you prefer?</label>
-            <div className="mt-2">
-              <SearchSelect
-                id="pref-breed"
-                value={values.breedPreference}
-                onChange={setValue('breedPreference')}
-                options={breedOptions}
-                disabled={!values.petType}
-                placeholder={values.petType ? `${NO_PREFERENCE}, or search a breed` : 'Pick the pet type first'}
-              />
+          <fieldset ref={typesRef} className="block text-sm font-semibold text-[#683B0D] sm:col-span-2">
+            <legend>What type of pet are you looking forward to adopt?</legend>
+            <p className="mt-1 text-xs font-normal text-[#989797]">
+              Choose 1 or 2 ({selectedTypes.length} of {MAX_PET_TYPES} chosen). Match scores are available for dogs,
+              cats and birds.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {PET_TYPES.map((type) => {
+                const checked = selectedTypes.includes(type)
+                const atLimit = selectedTypes.length >= MAX_PET_TYPES && !checked
+                return (
+                  <label
+                    key={type}
+                    className={`flex items-center gap-3 rounded-3xl border px-4 py-3 text-sm font-medium text-[#683B0D] transition ${
+                      checked ? 'border-[#CEA74E] bg-[#CEA74E]/10' : 'border-[#CACACA] bg-white'
+                    } ${atLimit ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:border-[#CEA74E]'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      name="petTypes"
+                      value={type}
+                      checked={checked}
+                      disabled={atLimit}
+                      // While nothing is chosen, every box is "required", so the browser
+                      // blocks the form and shows the message below.
+                      required={selectedTypes.length === 0}
+                      onInvalid={(event) => event.target.setCustomValidity('Choose at least one type of pet.')}
+                      onChange={() => togglePetType(type)}
+                      className="h-4 w-4 rounded border-[#CACACA] text-[#683B0D] focus:ring-[#CEA74E]"
+                    />
+                    {type}
+                  </label>
+                )
+              })}
             </div>
-          </div>
+          </fieldset>
+          {selectedTypes.length === 0 ? (
+            <div className="block text-sm font-semibold text-[#683B0D]">
+              <label htmlFor="pref-breed">What breed do you prefer?</label>
+              <div className="mt-2">
+                <SearchSelect
+                  id="pref-breed"
+                  value=""
+                  onChange={() => {}}
+                  options={[NO_PREFERENCE]}
+                  disabled
+                  placeholder="Pick the pet type first"
+                />
+              </div>
+            </div>
+          ) : (
+            selectedTypes.map((type) => (
+              <div key={type} className="block text-sm font-semibold text-[#683B0D]">
+                <label htmlFor={`pref-breed-${type}`}>{breedLabel(type)}</label>
+                <div className="mt-2">
+                  <SearchSelect
+                    id={`pref-breed-${type}`}
+                    value={breedPrefs[type] || ''}
+                    onChange={setBreedFor(type)}
+                    options={getPreferenceBreedOptions(type)}
+                    placeholder={`${NO_PREFERENCE}, or search a breed`}
+                  />
+                </div>
+              </div>
+            ))
+          )}
           <label className="block text-sm font-semibold text-[#683B0D]">
             What age range do you prefer?
             <select className={selectClasses} value={values.ageRangePreference} onChange={set('ageRangePreference')}>

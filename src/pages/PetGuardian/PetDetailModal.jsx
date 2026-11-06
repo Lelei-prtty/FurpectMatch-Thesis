@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Heart, X, ZoomIn } from 'lucide-react'
-import PetPhoto from '../../components/PetPhoto.jsx'
+import { ChevronLeft, ChevronRight, Heart, X, ZoomIn } from 'lucide-react'
+import PhotoGallery from '../../components/PhotoGallery.jsx'
 
 // 1-5 survey scale shown as filled dots. null = not provided.
 function ScaleRow({ label, value }) {
@@ -33,12 +33,22 @@ export default function PetDetailModal({ pet, open, onClose, isLiked, onToggleLi
   const [viewerOpen, setViewerOpen] = useState(false)
   // 0 = try the large version, 1 = fall back to the normal one, 2 = give up
   const [viewerStage, setViewerStage] = useState(0)
+  const [photoIndex, setPhotoIndex] = useState(0)
+
+  // All of the pet's photos (a listing can have several; dataset pets have one).
+  const gallery = pet ? (pet.images?.length ? pet.images : pet.image ? [pet.image] : []) : []
 
   // Start fresh whenever the modal closes or a different pet is opened.
   useEffect(() => {
     setViewerOpen(false)
     setViewerStage(0)
+    setPhotoIndex(0)
   }, [open, pet?.id])
+
+  // A different photo in the viewer starts with the large version again.
+  useEffect(() => {
+    setViewerStage(0)
+  }, [photoIndex])
 
   // Esc closes the full-size photo (and only the photo, not the whole modal).
   useEffect(() => {
@@ -47,11 +57,15 @@ export default function PetDetailModal({ pet, open, onClose, isLiked, onToggleLi
       if (event.key === 'Escape') {
         event.stopPropagation()
         setViewerOpen(false)
+      } else if (gallery.length > 1 && event.key === 'ArrowRight') {
+        setPhotoIndex((index) => (index + 1) % gallery.length)
+      } else if (gallery.length > 1 && event.key === 'ArrowLeft') {
+        setPhotoIndex((index) => (index - 1 + gallery.length) % gallery.length)
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [viewerOpen])
+  }, [viewerOpen, gallery.length])
 
   if (!open || !pet) return null
 
@@ -71,7 +85,8 @@ export default function PetDetailModal({ pet, open, onClose, isLiked, onToggleLi
   const kidsLabel =
     pet.goodWithKids === true ? 'Yes' : pet.goodWithKids === false ? 'No' : 'Not provided'
 
-  const viewerSrc = pet.image ? (viewerStage === 0 ? largeVersion(pet.image) : pet.image) : null
+  const currentImage = gallery.length ? gallery[Math.min(photoIndex, gallery.length - 1)] : null
+  const viewerSrc = currentImage ? (viewerStage === 0 ? largeVersion(currentImage) : currentImage) : null
 
   return (
     <>
@@ -84,9 +99,9 @@ export default function PetDetailModal({ pet, open, onClose, isLiked, onToggleLi
           onClick={(event) => event.stopPropagation()}
         >
           <div className="relative h-64 w-full overflow-hidden bg-[#CACACA] sm:h-80">
-            <PetPhoto src={pet.image} alt={pet.name} />
+            <PhotoGallery images={gallery} index={photoIndex} onIndexChange={setPhotoIndex} alt={pet.name} />
 
-            {pet.image && (
+            {currentImage && (
               <button
                 type="button"
                 onClick={() => setViewerOpen(true)}
@@ -216,6 +231,33 @@ export default function PetDetailModal({ pet, open, onClose, isLiked, onToggleLi
             <X className="h-5 w-5" />
           </button>
 
+          {gallery.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setPhotoIndex((index) => (index - 1 + gallery.length) % gallery.length)
+                }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-3 text-[#683B0D] shadow-sm hover:bg-white"
+                aria-label="Previous photo"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setPhotoIndex((index) => (index + 1) % gallery.length)
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-white/90 p-3 text-[#683B0D] shadow-sm hover:bg-white"
+                aria-label="Next photo"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </>
+          )}
+
           {viewerStage === 2 ? (
             <p className="text-sm text-white/80">Couldn't load this photo.</p>
           ) : (
@@ -230,7 +272,7 @@ export default function PetDetailModal({ pet, open, onClose, isLiked, onToggleLi
           )}
 
           <p className="pointer-events-none absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-4 py-1.5 text-sm font-semibold text-white">
-            {pet.name}
+            {gallery.length > 1 ? `${pet.name} · ${Math.min(photoIndex, gallery.length - 1) + 1} of ${gallery.length}` : pet.name}
           </p>
         </div>
       )}

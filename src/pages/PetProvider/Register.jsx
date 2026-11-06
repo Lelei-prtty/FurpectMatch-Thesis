@@ -10,8 +10,9 @@ import {
   startSession,
   validateConfirmPassword,
   validateEmail,
-  validateFullName,
   validatePassword,
+  validateNamePart,
+  TERMS_VERSION,
 } from '../../Data/Accounts.jsx'
 
 const DEFAULT_PET_INFO = {
@@ -36,12 +37,14 @@ export default function ProviderRegister() {
   const navigate = useNavigate()
 
   // Step 1 — account details
-  const [fullName, setFullName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
 
   // Step 2 — pet information
   const [petInfo, setPetInfo] = useState(DEFAULT_PET_INFO)
@@ -59,14 +62,21 @@ export default function ProviderRegister() {
   const isPetTab = activeTab === 'pet'
 
   // Validation is derived from the fields, shown once the person has tried to continue.
+  // The database also keeps a combined name, so everything that shows full_name keeps working.
+  const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
   const emailTaken = !validateEmail(email) && isEmailTaken(email)
   const errors = {
-    fullName: validateFullName(fullName),
+    firstName: validateNamePart(firstName, 'first name'),
+    lastName: validateNamePart(lastName, 'last name'),
     email: validateEmail(email) || (emailTaken ? 'An account with this email already exists. Try logging in instead.' : ''),
     password: validatePassword(password, { email, fullName }),
     confirmPassword: validateConfirmPassword(password, confirmPassword),
+    terms: termsAccepted ? '' : 'Please accept the Terms and Conditions to continue.',
   }
-  const shownError = (field) => (submitAttempted ? errors[field] || serverErrors[field] : '') || ''
+  const shownError = (field) =>
+    (submitAttempted
+      ? errors[field] || serverErrors[field] || (field === 'firstName' ? serverErrors.fullName : '')
+      : '') || ''
   const petErrors = {
     name: petInfo.name.trim() ? '' : 'Enter the pet\'s name.',
     breed: petInfo.breed.trim() ? '' : 'Enter the breed.',
@@ -94,7 +104,7 @@ export default function ProviderRegister() {
   const handleAccountSubmit = (event) => {
     event.preventDefault()
     setSubmitAttempted(true)
-    const firstInvalid = ['fullName', 'email', 'password', 'confirmPassword'].find((field) => errors[field])
+    const firstInvalid = ['firstName', 'lastName', 'email', 'password', 'confirmPassword', 'terms'].find((field) => errors[field])
     if (firstInvalid) {
       document.getElementById(`reg-${firstInvalid}`)?.focus()
       return
@@ -109,7 +119,16 @@ export default function ProviderRegister() {
   const finishRegistration = async (addPet) => {
     setSubmitting(true)
     setSubmitError('')
-    const result = await createAccount({ fullName, email, password, role: 'provider' })
+    const result = await createAccount({
+      fullName,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      email,
+      password,
+      role: 'provider',
+      termsAccepted: true,
+      termsVersion: TERMS_VERSION,
+    })
     setSubmitting(false)
 
     if (!result.ok) {
@@ -248,22 +267,44 @@ export default function ProviderRegister() {
                       {submitError}
                     </div>
                   )}
-                  <label className="block text-sm font-semibold text-[#683B0D]">
-                    Full Name
-                    <input
-                      type="text"
-                      value={fullName}
-                      onChange={(event) => setFullName(event.target.value)}
-                      id="reg-fullName"
-                      autoComplete="name"
-                      aria-invalid={Boolean(shownError('fullName'))}
-                      placeholder="Maria Santos"
-                      className={`mt-2 w-full rounded-3xl border ${shownError('fullName') ? 'border-red-400' : 'border-[#CACACA]'} bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20`}
-                    />
-                                    {shownError('fullName') && (
-                    <p role="alert" className="mt-2 text-xs font-medium text-red-600">{shownError('fullName')}</p>
-                  )}
-                  </label>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <label className="block text-sm font-semibold text-[#683B0D]">
+                      First Name
+                      <input
+                        type="text"
+                        value={firstName}
+                        onChange={(event) => {
+                          setFirstName(event.target.value)
+                        }}
+                        id="reg-firstName"
+                        autoComplete="given-name"
+                        aria-invalid={Boolean(shownError('firstName'))}
+                        placeholder="Maria"
+                        className={`mt-2 w-full rounded-3xl border ${shownError('firstName') ? 'border-red-400' : 'border-[#CACACA]'} bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20`}
+                      />
+                      {shownError('firstName') && (
+                        <p role="alert" className="mt-2 text-xs font-medium text-red-600">{shownError('firstName')}</p>
+                      )}
+                    </label>
+                    <label className="block text-sm font-semibold text-[#683B0D]">
+                      Last Name
+                      <input
+                        type="text"
+                        value={lastName}
+                        onChange={(event) => {
+                          setLastName(event.target.value)
+                        }}
+                        id="reg-lastName"
+                        autoComplete="family-name"
+                        aria-invalid={Boolean(shownError('lastName'))}
+                        placeholder="Santos"
+                        className={`mt-2 w-full rounded-3xl border ${shownError('lastName') ? 'border-red-400' : 'border-[#CACACA]'} bg-white px-4 py-3 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20`}
+                      />
+                      {shownError('lastName') && (
+                        <p role="alert" className="mt-2 text-xs font-medium text-red-600">{shownError('lastName')}</p>
+                      )}
+                    </label>
+                  </div>
                   <label className="block text-sm font-semibold text-[#683B0D]">
                     Email
                     <input
@@ -352,6 +393,38 @@ export default function ProviderRegister() {
                     <p role="alert" className="mt-2 text-xs font-medium text-red-600">{shownError('confirmPassword')}</p>
                   )}
                   </label>
+                  <div>
+                    <label htmlFor="reg-terms" className="flex items-start gap-3 text-sm text-[#683B0D]">
+                      <input
+                        id="reg-terms"
+                        type="checkbox"
+                        checked={termsAccepted}
+                        onChange={(event) => {
+                          setTermsAccepted(event.target.checked)
+                          if (submitError) setSubmitError('')
+                        }}
+                        aria-invalid={Boolean(shownError('terms'))}
+                        aria-describedby={shownError('terms') ? 'reg-terms-error' : undefined}
+                        className="mt-0.5 h-4 w-4 rounded border-[#CACACA] text-[#683B0D] focus:ring-[#CEA74E]"
+                      />
+                      <span>
+                        I have read and agree to the{' '}
+                        <Link
+                          to="/terms"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-semibold underline hover:text-[#CEA74E]"
+                        >
+                          Terms and Conditions
+                        </Link>
+                        .
+                      </span>
+                    </label>
+                    {shownError('terms') && (
+                      <p id="reg-terms-error" role="alert" className="mt-2 text-xs font-medium text-red-600">{shownError('terms')}</p>
+                    )}
+                  </div>
+
                   <button
                     type="submit"
                     className="w-full rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
@@ -393,7 +466,9 @@ export default function ProviderRegister() {
                         <option>Cat</option>
                         <option>Rabbit</option>
                         <option>Bird</option>
-                        <option>Other</option>
+                        <option>Hamster</option>
+                        <option>Guinea Pig</option>
+                        <option>Fish</option>
                       </select>
                     </label>
                     <div className="block text-sm font-semibold text-[#683B0D]">
@@ -405,7 +480,7 @@ export default function ProviderRegister() {
                           onChange={(breed) => handlePetInfoChange('breed', breed)}
                           onPick={handleBreedPick}
                           options={getBreedOptions(petInfo.species)}
-                          placeholder={petInfo.species === 'Other' ? 'Type the kind of animal' : 'Search or pick a breed'}
+                          placeholder="Search or pick a breed"
                           invalid={Boolean(shownPetError('breed'))}
                         />
                       </div>

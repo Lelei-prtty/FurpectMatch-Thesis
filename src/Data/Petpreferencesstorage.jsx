@@ -8,7 +8,12 @@
 //
 // Answers an earlier version kept in this browser's localStorage are moved to the
 // account the first time they're loaded.
+//
+// Pet types: a guardian can now choose 1 or 2. Preferences always carry `petTypes` (the
+// list) and `petType` (the first of them, for older code). Answers saved before this change
+// only had `petType`; they are converted whenever they are loaded or saved.
 import { getCurrentUser } from './Accounts.jsx'
+import { withPetTypes } from './Petpreferencesoptions.jsx'
 import { supabase } from '../lib/supabaseClient.js'
 
 const LEGACY_BASE_KEY = 'furpectMatch.guardianPetPreferences'
@@ -21,12 +26,15 @@ const idFor = (userId) => userId ?? getCurrentUser()?.id ?? null
 const hasValues = (preferences) =>
   Boolean(preferences) &&
   typeof preferences === 'object' &&
-  Object.values(preferences).some((value) => value !== '' && value !== null && value !== undefined)
+  Object.values(preferences).some(
+    (value) =>
+      value !== '' && value !== null && value !== undefined && !(Array.isArray(value) && value.length === 0)
+  )
 
 function readLegacy(userId) {
   try {
     const raw = window.localStorage.getItem(legacyKey(userId))
-    return raw ? JSON.parse(raw) : null
+    return raw ? withPetTypes(JSON.parse(raw)) : null
   } catch (error) {
     console.error('Failed to read old pet preferences from storage', error)
     return null
@@ -82,7 +90,7 @@ export async function loadPetPreferences(userId) {
       return getPetPreferences(id)
     }
 
-    let value = hasValues(data?.preferences) ? data.preferences : null
+    let value = hasValues(data?.preferences) ? withPetTypes(data.preferences) : null
     if (!value) {
       // One-time move of answers an earlier version kept in this browser.
       const legacy = readLegacy(id)
@@ -111,10 +119,11 @@ export async function savePetPreferences(preferences, userId) {
   const id = idFor(userId)
   if (!id) return false
 
+  const normalized = withPetTypes(preferences) // petTypes (max 2) and petType always agree
   const before = cache.userId === id ? cache : { userId: id, value: null, loaded: false }
-  cache = { userId: id, value: preferences, loaded: true } // screens see the new answers right away
+  cache = { userId: id, value: normalized, loaded: true } // screens see the new answers right away
 
-  const saved = await writePreferences(id, preferences)
+  const saved = await writePreferences(id, normalized)
   if (!saved) {
     cache = { ...before, userId: id }
     return false

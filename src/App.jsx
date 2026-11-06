@@ -13,6 +13,7 @@ import PetModal from './pages/PetProvider/PetModal'
 import ApplicationModal from './pages/PetProvider/ApplicationModal'
 import MessageModal from './pages/PetProvider/MessageModal'
 import { getCurrentUser } from './Data/Accounts.jsx'
+import Terms from './pages/Terms.jsx'
 
 // Guardian pages need a signed-in account. Anyone else is sent to the login page
 // and brought back to where they were headed after logging in.
@@ -49,6 +50,7 @@ export default function App() {
 
   return (
     <Routes>
+      <Route path="/terms" element={<Terms />} />
       <Route path="/" element={<HomePage />} />
       <Route path="/login" element={<Navigate to="/guardian/login" replace />} />
       <Route path="/register" element={<Navigate to="/provider/register" replace />} />

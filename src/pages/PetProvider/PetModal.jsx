@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { X } from 'lucide-react'
+import PhotoGallery from '../../components/PhotoGallery.jsx'
 import { createPortal } from 'react-dom'
 import { LISTING_STATUSES } from '../../Data/ProviderSession.jsx'
 
@@ -23,7 +25,14 @@ export default function PetModal({
   onChangeStatus,
   onRemove,
 }) {
+  const [photoIndex, setPhotoIndex] = useState(0)
+  useEffect(() => {
+    setPhotoIndex(0)
+  }, [pet?.id])
+
   if (!pet) return null
+
+  const gallery = pet.images?.length ? pet.images : pet.image ? [pet.image] : []
 
   const facts = [
     { label: 'Species', value: pet.species },
@@ -56,8 +65,8 @@ export default function PetModal({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="relative h-64 w-full overflow-hidden bg-[#CACACA] sm:h-80">
-          {pet.image ? (
-            <img src={pet.image} alt={pet.name} className="h-full w-full object-cover" />
+          {gallery.length > 0 ? (
+            <PhotoGallery images={gallery} index={photoIndex} onIndexChange={setPhotoIndex} alt={pet.name} />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-6xl font-bold text-[#683B0D]/40">
               {(pet.name || '?').charAt(0).toUpperCase()}

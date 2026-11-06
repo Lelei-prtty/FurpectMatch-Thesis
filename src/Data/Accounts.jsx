@@ -15,6 +15,15 @@
 //    decides whether the session survives closing the browser.
 //  - getCurrentUser() is still synchronous. It reads a copy kept in memory that
 //    initAuth() fills before the app first renders (see main.jsx).
+//
+// Names, terms and verification:
+//  - Accounts now store first_name and last_name. full_name is still filled in by the
+//    database (a trigger builds it), so anything that shows fullName keeps working.
+//  - createAccount() requires termsAccepted: true and records which version was accepted.
+//  - The user object now carries firstName, lastName and verificationStatus
+//    ('unverified' | 'pending' | 'verified' | 'rejected').
+//  - This file needs the profile columns from "Block A" (first_name, last_name,
+//    verification_status, terms_accepted_at, terms_version) to exist in Supabase.
 
 import { clearStoredSession, isSupabaseConfigured, setRememberChoice, supabase } from '../lib/supabaseClient.js'
 
@@ -23,6 +32,10 @@ const MAX_FAILED_ATTEMPTS = 5
 const LOCKOUT_MS = 60 * 1000
 const EMAIL_TAKEN = 'An account with this email already exists. Try logging in instead.'
 
+// Bump this whenever the Terms and Conditions text changes. Terms.jsx shows it,
+// and every new account records the version that was accepted.
+export const TERMS_VERSION = '2026-10'
+
 // ---------------------------------------------------------------------------
 // Normalizers
 // ---------------------------------------------------------------------------
@@ -30,6 +43,14 @@ const EMAIL_TAKEN = 'An account with this email already exists. Try logging in i
 export const normalizeEmail = (value) => String(value ?? '').trim().toLowerCase()
 
 export const normalizeName = (value) => String(value ?? '').trim().replace(/\s+/g, ' ')
+
+/** "Maria Cruz Santos" -> { first: "Maria", last: "Cruz Santos" } */
+function splitFullName(value) {
+  const name = normalizeName(value)
+  const space = name.indexOf(' ')
+  if (space === -1) return { first: name, last: '' }
+  return { first: name.slice(0, space), last: name.slice(space + 1) }
+}
 
 /** "0917 123 4567" / "+63 917-123-4567" / "639171234567" -> "+639171234567" (or null if invalid). */
 export function normalizePhone(value) {
@@ -59,6 +80,18 @@ export function validateFullName(value) {
   if (name.length > 60) return 'Your name must be 60 characters or fewer.'
   if (!NAME_RE.test(name) || (name.match(/\p{L}/gu) || []).length < 2) {
     return 'Use letters only (spaces, hyphens, apostrophes and periods are fine).'
+  }
+  return ''
+}
+
+/** One part of a name (first or last). `label` is used in the message, e.g. "first name". */
+export function validateNamePart(value, label = 'name') {
+  const text = normalizeName(value)
+  if (!text) return `Enter your ${label}.`
+  if (text.length < 2) return `Your ${label} must be at least 2 characters.`
+  if (text.length > 50) return `Your ${label} is too long.`
+  if (!NAME_RE.test(text) || (text.match(/\p{L}/gu) || []).length < 2) {
+    return `Your ${label} can only contain letters, spaces, hyphens, apostrophes and periods.`
   }
   return ''
 }
@@ -161,7 +194,8 @@ const isRateLimit = (error) =>
 // The signed-in person (kept in memory so getCurrentUser() can stay synchronous)
 // ---------------------------------------------------------------------------
 
-const PROFILE_COLUMNS = 'id, role, full_name, phone, location, created_at'
+const PROFILE_COLUMNS =
+  'id, role, first_name, last_name, full_name, phone, location, verification_status, created_at'
 
 let currentUser = null
 
@@ -169,10 +203,13 @@ function toUser(authUser, profile) {
   return {
     id: authUser.id,
     role: profile.role,
+    firstName: profile.first_name || '',
+    lastName: profile.last_name || '',
     fullName: profile.full_name,
     email: authUser.email ?? '',
     phone: profile.phone || '',
     location: profile.location || '',
+    verificationStatus: profile.verification_status || 'unverified',
     createdAt: profile.created_at,
   }
 }
@@ -256,19 +293,48 @@ export function isEmailTaken() {
 /**
  * Validates and creates an account (and signs the person in).
  * Resolves { ok: true, user } or { ok: false, reason, errors?: { field: message }, message? }.
+ *
+ * Send firstName + lastName (the register forms do). A caller that only sends fullName
+ * still works: the name is split at the first space.
+ * termsAccepted must be true; the accepted version is stored with the profile.
  */
-export async function createAccount({ fullName, email, phone = '', location = '', password, role = 'guardian' }) {
+export async function createAccount({
+  fullName = '',
+  firstName,
+  lastName,
+  email,
+  phone = '',
+  location = '',
+  password,
+  role = 'guardian',
+  termsAccepted = false,
+  termsVersion = TERMS_VERSION,
+}) {
+  const splitName = firstName !== undefined || lastName !== undefined
+  const fromFull = splitFullName(fullName)
+  const first = splitName ? normalizeName(firstName) : fromFull.first
+  const last = splitName ? normalizeName(lastName) : fromFull.last
+  const combinedName = splitName ? normalizeName(`${first} ${last}`) : normalizeName(fullName)
+
   const errors = {}
-  const nameError = validateFullName(fullName)
+  if (splitName) {
+    const firstError = validateNamePart(first, 'first name')
+    const lastError = validateNamePart(last, 'last name')
+    if (firstError) errors.firstName = firstError
+    if (lastError) errors.lastName = lastError
+  } else {
+    const nameError = validateFullName(fullName)
+    if (nameError) errors.fullName = nameError
+  }
   const emailError = validateEmail(email)
   const phoneError = validatePhone(phone)
   const locationError = validateLocation(location)
-  const passwordError = validatePassword(password, { email, fullName })
-  if (nameError) errors.fullName = nameError
+  const passwordError = validatePassword(password, { email, fullName: combinedName })
   if (emailError) errors.email = emailError
   if (phoneError) errors.phone = phoneError
   if (locationError) errors.location = locationError
   if (passwordError) errors.password = passwordError
+  if (termsAccepted !== true) errors.terms = 'Please accept the Terms and Conditions to continue.'
   if (Object.keys(errors).length > 0) return { ok: false, reason: 'validation', errors }
   if (!isSupabaseConfigured) return NOT_CONFIGURED
 
@@ -282,9 +348,13 @@ export async function createAccount({ fullName, email, phone = '', location = ''
         // 'guardian' or 'provider' there as well).
         data: {
           role: role === 'provider' ? 'provider' : 'guardian',
-          full_name: normalizeName(fullName),
+          full_name: combinedName,
+          first_name: first,
+          last_name: last,
           phone: normalizePhone(phone) || '',
           location: String(location ?? '').trim(),
+          terms_accepted: true,
+          terms_version: String(termsVersion),
         },
       },
     })
@@ -448,13 +518,30 @@ export function endSession() {
 // Public API: profile + password changes
 // ---------------------------------------------------------------------------
 
-/** Updates name / phone / location. Resolves { ok: true, user } or { ok: false, errors | message }. */
-export async function updateProfile(userId, { fullName, phone, location }) {
+/**
+ * Updates name / phone / location. Resolves { ok: true, user } or { ok: false, errors | message }.
+ * Pass firstName + lastName, or just fullName (split at the first space). The database
+ * rebuilds full_name from the two parts, so they never drift apart.
+ */
+export async function updateProfile(userId, { fullName, firstName, lastName, phone, location }) {
   const errors = {}
-  const nameError = validateFullName(fullName)
+  const splitName = firstName !== undefined || lastName !== undefined
+  let first
+  let last
+  if (splitName) {
+    first = normalizeName(firstName)
+    last = normalizeName(lastName)
+    const firstError = validateNamePart(first, 'first name')
+    const lastError = validateNamePart(last, 'last name')
+    if (firstError) errors.firstName = firstError
+    if (lastError) errors.lastName = lastError
+  } else {
+    const nameError = validateFullName(fullName)
+    if (nameError) errors.fullName = nameError
+    ;({ first, last } = splitFullName(fullName))
+  }
   const phoneError = validatePhone(phone)
   const locationError = validateLocation(location)
-  if (nameError) errors.fullName = nameError
   if (phoneError) errors.phone = phoneError
   if (locationError) errors.location = locationError
   if (Object.keys(errors).length > 0) return { ok: false, reason: 'validation', errors }
@@ -467,7 +554,8 @@ export async function updateProfile(userId, { fullName, phone, location }) {
     const { data, error } = await supabase
       .from('profiles')
       .update({
-        full_name: normalizeName(fullName),
+        first_name: first,
+        last_name: last || null,
         phone: normalizePhone(phone) || null,
         location: String(location ?? '').trim() || null,
       })
