@@ -24,52 +24,52 @@ const formatMemberSince = (iso) => {
     : ''
 }
 
-const Notice = ({ notice }) =>
-  notice ? (
-    <div
-      role="alert"
-      className={`rounded-3xl border px-4 py-3 text-sm ${
-        notice.tone === 'success'
-          ? 'border-green-200 bg-green-50 text-green-700'
-          : 'border-red-200 bg-red-50 text-red-700'
-      }`}
-    >
-      {notice.text}
-    </div>
+function FieldError({ id, message }) {
+  return message ? (
+    <p id={id} role="alert" className="mt-2 text-xs font-medium text-red-600">{message}</p>
   ) : null
+}
 
-const FieldError = ({ message }) =>
-  message ? <p role="alert" className="mt-2 text-xs font-medium text-red-600">{message}</p> : null
-
-const tabs = ['Personal Information', 'Password']
+function Notice({ tone, children }) {
+  const styles = tone === 'success'
+    ? 'border-green-200 bg-green-50 text-green-800'
+    : 'border-red-200 bg-red-50 text-red-700'
+  return (
+    <div role={tone === 'success' ? 'status' : 'alert'} className={`rounded-3xl border px-4 py-3 text-sm ${styles}`}>
+      {children}
+    </div>
+  )
+}
 
 export default function ProfileModal({ open, onClose, user, onUserChange }) {
-  const [activeTab, setActiveTab] = useState(tabs[0])
+  // Personal information form (name / phone / location). Email can't be changed.
   const [profileDraft, setProfileDraft] = useState({ fullName: '', phone: '', location: '' })
   const [profileErrors, setProfileErrors] = useState({})
-  const [profileNotice, setProfileNotice] = useState(null)
+  const [profileNotice, setProfileNotice] = useState(null) // { tone, text }
   const [savingProfile, setSavingProfile] = useState(false)
+
+  // Change-password form
   const [passwordDraft, setPasswordDraft] = useState({ current: '', next: '', confirm: '' })
   const [passwordErrors, setPasswordErrors] = useState({})
   const [passwordNotice, setPasswordNotice] = useState(null)
-  const [savingPassword, setSavingPassword] = useState(false)
   const [showPasswords, setShowPasswords] = useState(false)
+  const [savingPassword, setSavingPassword] = useState(false)
 
-  // Fill the form from the saved account whenever the modal opens or the user's details arrive/change.
+  // Start every opening with the saved values and a clean slate.
   useEffect(() => {
-    if (!open || !user) return
-    setActiveTab(tabs[0])
+    if (!open) return
     setProfileDraft({
-      fullName: user.fullName || user.full_name || '',
-      phone: user.phone ? formatPhone(user.phone) : '',
-      location: user.location || '',
+      fullName: user?.fullName || '',
+      phone: user?.phone ? formatPhone(user.phone) : '',
+      location: user?.location || '',
     })
     setProfileErrors({})
     setProfileNotice(null)
     setPasswordDraft({ current: '', next: '', confirm: '' })
     setPasswordErrors({})
     setPasswordNotice(null)
-  }, [open, user?.id, user?.fullName, user?.full_name, user?.phone, user?.location]) // eslint-disable-line react-hooks/exhaustive-deps
+    setShowPasswords(false)
+  }, [open, user?.id, user?.fullName, user?.phone, user?.location]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) return null
 
@@ -81,13 +81,13 @@ export default function ProfileModal({ open, onClose, user, onUserChange }) {
     try {
       result = await updateProfile(user.id, profileDraft)
     } catch (err) {
-      result = { ok: false, message: err?.message || 'Could not save your profile.' }
+      result = { ok: false, message: 'We couldn’t save your changes. Please try again.' }
     }
     setSavingProfile(false)
     if (!result?.ok) {
       setProfileErrors(result?.errors || {})
       if (!result?.errors) {
-        setProfileNotice({ tone: 'error', text: result?.message || 'Could not save your profile.' })
+        setProfileNotice({ tone: 'error', text: result?.message || 'We couldn’t save your changes.' })
       }
       return
     }
@@ -124,12 +124,10 @@ export default function ProfileModal({ open, onClose, user, onUserChange }) {
 
   const passwordChecks = getPasswordChecks(passwordDraft.next, { email: user?.email, fullName: user?.fullName })
   const passwordInputType = showPasswords ? 'text' : 'password'
-  const memberSince = formatMemberSince(user?.createdAt)
-  const displayName = user?.fullName || user?.full_name || ''
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 sm:px-6">
-      <div className="w-full max-w-4xl overflow-hidden rounded-4xl bg-white shadow-2xl ring-1 ring-black/10">
+      <div className="w-full max-w-5xl overflow-hidden rounded-4xl bg-white shadow-2xl ring-1 ring-black/10">
         <div className="flex flex-col gap-4 border-b border-[#CACACA] bg-[#683B0D] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.3em] text-[#CEA74E]">My Profile</p>
@@ -144,173 +142,212 @@ export default function ProfileModal({ open, onClose, user, onUserChange }) {
           </button>
         </div>
 
-        <div className="flex flex-col gap-4 border-b border-[#CACACA] bg-white px-5 py-4 sm:flex-row sm:items-center sm:px-6">
-          {tabs.map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                activeTab === tab ? 'bg-[#683B0D] text-white' : 'bg-[#CACACA]/30 text-[#989797] hover:bg-[#CACACA]/50'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        <div className="max-h-[calc(100vh-232px)] overflow-y-auto p-5 sm:p-6">
+        <div className="max-h-[calc(100vh-160px)] overflow-y-auto p-5 sm:p-6">
           {!user ? (
             <p className="text-sm text-[#989797]">Please log in again to see your profile.</p>
-          ) : activeTab === 'Personal Information' ? (
-            <div className="grid gap-6 lg:grid-cols-[280px_auto]">
+          ) : (
+            <div className="grid gap-6 lg:grid-cols-[320px_auto]">
+              {/* Summary of the saved account details */}
               <div className="h-fit rounded-4xl border border-[#CACACA] bg-[#CACACA]/20 p-6 shadow-sm">
                 <div className="flex items-center gap-4">
                   <div
                     className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-[#CEA74E]/25 text-2xl font-bold text-[#683B0D]"
                     aria-hidden="true"
                   >
-                    {initialsOf(displayName)}
+                    {initialsOf(user.fullName) || '?'}
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-lg font-semibold text-[#683B0D]">{displayName}</p>
-                    <p className="text-sm text-[#989797]">Pet Provider</p>
+                    <p className="break-words text-xl font-semibold text-[#683B0D]">{user.fullName}</p>
+                    <p className="mt-1 text-sm text-[#989797]">Pet Provider</p>
                   </div>
                 </div>
-                <p className="mt-4 break-all text-sm text-[#683B0D]">{user.email}</p>
-                {memberSince && <p className="mt-1 text-xs text-[#989797]">Member since {memberSince}</p>}
+                <div className="mt-6 space-y-4">
+                  {[
+                    { label: 'Email', value: user.email, breakAll: true },
+                    { label: 'Phone', value: user.phone ? formatPhone(user.phone) : '' },
+                    { label: 'Location', value: user.location },
+                    { label: 'Member since', value: formatMemberSince(user.createdAt) },
+                  ].map((item) => (
+                    <div key={item.label}>
+                      <p className="text-sm text-[#989797]">{item.label}</p>
+                      {item.value ? (
+                        <p className={`mt-1 text-base font-medium text-[#683B0D] ${item.breakAll ? 'break-all' : ''}`}>{item.value}</p>
+                      ) : (
+                        <p className="mt-1 text-base italic text-[#989797]">Not provided</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <form className="space-y-5" onSubmit={handleProfileSave} noValidate>
-                <Notice notice={profileNotice} />
-                <div className="grid gap-5 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="pf-name" className="block text-sm font-semibold text-[#683B0D]">Full name</label>
-                    <input
-                      id="pf-name"
-                      value={profileDraft.fullName}
-                      onChange={(e) => { setProfileDraft((p) => ({ ...p, fullName: e.target.value })); setProfileErrors((p) => ({ ...p, fullName: undefined })) }}
-                      aria-invalid={Boolean(profileErrors.fullName)}
-                      className={inputClass(profileErrors.fullName)}
-                    />
-                    <FieldError message={profileErrors.fullName} />
+              <div className="space-y-6">
+                {/* Edit personal information */}
+                <form onSubmit={handleProfileSave} noValidate className="rounded-4xl border border-[#CACACA] bg-white p-6 shadow-sm">
+                  <p className="text-sm font-semibold text-[#683B0D]">Personal information</p>
+                  <p className="mt-2 text-sm text-[#989797]">Update how your name and contact details appear.</p>
+
+                  {profileNotice && <div className="mt-4"><Notice tone={profileNotice.tone}>{profileNotice.text}</Notice></div>}
+
+                  <div className="mt-5 grid gap-5 sm:grid-cols-2">
+                    <div className="sm:col-span-2">
+                      <label htmlFor="pf-fullName" className="block text-sm font-semibold text-[#683B0D]">Full name</label>
+                      <input
+                        id="pf-fullName"
+                        type="text"
+                        autoComplete="name"
+                        value={profileDraft.fullName}
+                        onChange={(e) => { setProfileDraft((p) => ({ ...p, fullName: e.target.value })); setProfileErrors((p) => ({ ...p, fullName: undefined })); setProfileNotice(null) }}
+                        aria-invalid={Boolean(profileErrors.fullName)}
+                        aria-describedby={profileErrors.fullName ? 'pf-fullName-error' : undefined}
+                        className={inputClass(profileErrors.fullName)}
+                      />
+                      <FieldError id="pf-fullName-error" message={profileErrors.fullName} />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label htmlFor="pf-email" className="block text-sm font-semibold text-[#683B0D]">Email</label>
+                      <input
+                        id="pf-email"
+                        type="email"
+                        value={user.email || ''}
+                        readOnly
+                        className="mt-2 w-full cursor-not-allowed rounded-3xl border border-[#CACACA] bg-[#CACACA]/20 px-4 py-3 text-sm text-[#989797] outline-none"
+                      />
+                      <p className="mt-2 text-xs text-[#989797]">Your email is your login, so it can't be changed here.</p>
+                    </div>
+
+                    <div>
+                      <label htmlFor="pf-phone" className="block text-sm font-semibold text-[#683B0D]">
+                        Mobile number <span className="font-normal text-[#989797]">(optional)</span>
+                      </label>
+                      <input
+                        id="pf-phone"
+                        type="tel"
+                        autoComplete="tel"
+                        value={profileDraft.phone}
+                        onChange={(e) => { setProfileDraft((p) => ({ ...p, phone: e.target.value })); setProfileErrors((p) => ({ ...p, phone: undefined })); setProfileNotice(null) }}
+                        aria-invalid={Boolean(profileErrors.phone)}
+                        aria-describedby={profileErrors.phone ? 'pf-phone-error' : undefined}
+                        placeholder="0917 123 4567"
+                        className={inputClass(profileErrors.phone)}
+                      />
+                      <FieldError id="pf-phone-error" message={profileErrors.phone} />
+                    </div>
+
+                    <div>
+                      <label htmlFor="pf-location" className="block text-sm font-semibold text-[#683B0D]">
+                        Location <span className="font-normal text-[#989797]">(optional)</span>
+                      </label>
+                      <input
+                        id="pf-location"
+                        type="text"
+                        autoComplete="address-level2"
+                        value={profileDraft.location}
+                        onChange={(e) => { setProfileDraft((p) => ({ ...p, location: e.target.value })); setProfileErrors((p) => ({ ...p, location: undefined })); setProfileNotice(null) }}
+                        aria-invalid={Boolean(profileErrors.location)}
+                        aria-describedby={profileErrors.location ? 'pf-location-error' : undefined}
+                        placeholder="Antipolo, Rizal"
+                        className={inputClass(profileErrors.location)}
+                      />
+                      <FieldError id="pf-location-error" message={profileErrors.location} />
+                      <p className="mt-2 text-xs text-[#989797]">Used as the default location for new pet listings.</p>
+                    </div>
                   </div>
-                  <div>
-                    <label htmlFor="pf-email" className="block text-sm font-semibold text-[#683B0D]">Email</label>
-                    <input
-                      id="pf-email"
-                      value={user.email || ''}
-                      readOnly
-                      className="mt-2 w-full cursor-not-allowed rounded-3xl border border-[#CACACA] bg-[#CACACA]/20 px-4 py-3 text-sm text-[#989797] outline-none"
-                    />
+
+                  <div className="mt-6 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={savingProfile}
+                      className="rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingProfile ? 'Saving…' : 'Save changes'}
+                    </button>
                   </div>
-                  <div>
-                    <label htmlFor="pf-phone" className="block text-sm font-semibold text-[#683B0D]">Mobile number</label>
-                    <input
-                      id="pf-phone"
-                      value={profileDraft.phone}
-                      onChange={(e) => { setProfileDraft((p) => ({ ...p, phone: e.target.value })); setProfileErrors((p) => ({ ...p, phone: undefined })) }}
-                      aria-invalid={Boolean(profileErrors.phone)}
-                      placeholder="0917 123 4567"
-                      className={inputClass(profileErrors.phone)}
-                    />
-                    <FieldError message={profileErrors.phone} />
+                </form>
+
+                {/* Change password */}
+                <form onSubmit={handlePasswordSave} noValidate className="rounded-4xl border border-[#CACACA] bg-white p-6 shadow-sm">
+                  <p className="text-sm font-semibold text-[#683B0D]">Change password</p>
+                  <p className="mt-2 text-sm text-[#989797]">Choose a strong password you don't use anywhere else.</p>
+
+                  {passwordNotice && <div className="mt-4"><Notice tone={passwordNotice.tone}>{passwordNotice.text}</Notice></div>}
+
+                  <div className="mt-5 space-y-5">
+                    <div>
+                      <label htmlFor="pw-current" className="block text-sm font-semibold text-[#683B0D]">Current password</label>
+                      <input
+                        id="pw-current"
+                        type={passwordInputType}
+                        autoComplete="current-password"
+                        value={passwordDraft.current}
+                        onChange={(e) => { setPasswordDraft((p) => ({ ...p, current: e.target.value })); setPasswordErrors((p) => ({ ...p, currentPassword: undefined })); setPasswordNotice(null) }}
+                        aria-invalid={Boolean(passwordErrors.currentPassword)}
+                        aria-describedby={passwordErrors.currentPassword ? 'pw-current-error' : undefined}
+                        className={inputClass(passwordErrors.currentPassword)}
+                      />
+                      <FieldError id="pw-current-error" message={passwordErrors.currentPassword} />
+                    </div>
+
+                    <div>
+                      <label htmlFor="pw-new" className="block text-sm font-semibold text-[#683B0D]">New password</label>
+                      <input
+                        id="pw-new"
+                        type={passwordInputType}
+                        autoComplete="new-password"
+                        value={passwordDraft.next}
+                        onChange={(e) => { setPasswordDraft((p) => ({ ...p, next: e.target.value })); setPasswordErrors((p) => ({ ...p, newPassword: undefined })); setPasswordNotice(null) }}
+                        aria-invalid={Boolean(passwordErrors.newPassword)}
+                        aria-describedby="pw-new-rules"
+                        className={inputClass(passwordErrors.newPassword)}
+                      />
+                      <FieldError id="pw-new-error" message={passwordErrors.newPassword} />
+                      <ul id="pw-new-rules" className="mt-3 grid gap-1 text-xs sm:grid-cols-2">
+                        {passwordChecks.map((check) => (
+                          <li key={check.id} className={check.ok ? 'text-green-700' : 'text-[#989797]'}>
+                            <span aria-hidden="true">{check.ok ? '✓' : '○'}</span> {check.label}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div>
+                      <label htmlFor="pw-confirm" className="block text-sm font-semibold text-[#683B0D]">Confirm new password</label>
+                      <input
+                        id="pw-confirm"
+                        type={passwordInputType}
+                        autoComplete="new-password"
+                        value={passwordDraft.confirm}
+                        onChange={(e) => { setPasswordDraft((p) => ({ ...p, confirm: e.target.value })); setPasswordErrors((p) => ({ ...p, confirm: undefined })); setPasswordNotice(null) }}
+                        aria-invalid={Boolean(passwordErrors.confirm)}
+                        aria-describedby={passwordErrors.confirm ? 'pw-confirm-error' : undefined}
+                        className={inputClass(passwordErrors.confirm)}
+                      />
+                      <FieldError id="pw-confirm-error" message={passwordErrors.confirm} />
+                    </div>
+
+                    <label className="flex cursor-pointer items-center gap-2 text-sm text-[#989797]">
+                      <input
+                        type="checkbox"
+                        checked={showPasswords}
+                        onChange={(e) => setShowPasswords(e.target.checked)}
+                        className="h-4 w-4 rounded border-[#CACACA] text-[#683B0D] focus:ring-[#CEA74E]"
+                      />
+                      Show passwords
+                    </label>
                   </div>
-                  <div>
-                    <label htmlFor="pf-location" className="block text-sm font-semibold text-[#683B0D]">Location</label>
-                    <input
-                      id="pf-location"
-                      value={profileDraft.location}
-                      onChange={(e) => { setProfileDraft((p) => ({ ...p, location: e.target.value })); setProfileErrors((p) => ({ ...p, location: undefined })) }}
-                      aria-invalid={Boolean(profileErrors.location)}
-                      placeholder="Antipolo, Rizal"
-                      className={inputClass(profileErrors.location)}
-                    />
-                    <FieldError message={profileErrors.location} />
-                    <p className="mt-1 text-xs text-[#989797]">Used as the default location for new pet listings.</p>
+
+                  <div className="mt-6 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={savingPassword}
+                      className="rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingPassword ? 'Saving…' : 'Change password'}
+                    </button>
                   </div>
-                </div>
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={savingProfile}
-                    className="rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E] disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {savingProfile ? 'Saving…' : 'Save changes'}
-                  </button>
-                </div>
-              </form>
+                </form>
+              </div>
             </div>
-          ) : (
-            <form className="mx-auto max-w-lg space-y-5" onSubmit={handlePasswordSave} noValidate>
-              <Notice notice={passwordNotice} />
-              <div>
-                <label htmlFor="pw-current" className="block text-sm font-semibold text-[#683B0D]">Current password</label>
-                <input
-                  id="pw-current"
-                  type={passwordInputType}
-                  autoComplete="current-password"
-                  value={passwordDraft.current}
-                  onChange={(e) => { setPasswordDraft((p) => ({ ...p, current: e.target.value })); setPasswordErrors((p) => ({ ...p, currentPassword: undefined })) }}
-                  aria-invalid={Boolean(passwordErrors.currentPassword)}
-                  className={inputClass(passwordErrors.currentPassword)}
-                />
-                <FieldError message={passwordErrors.currentPassword} />
-              </div>
-              <div>
-                <label htmlFor="pw-new" className="block text-sm font-semibold text-[#683B0D]">New password</label>
-                <input
-                  id="pw-new"
-                  type={passwordInputType}
-                  autoComplete="new-password"
-                  value={passwordDraft.next}
-                  onChange={(e) => { setPasswordDraft((p) => ({ ...p, next: e.target.value })); setPasswordErrors((p) => ({ ...p, newPassword: undefined })) }}
-                  aria-invalid={Boolean(passwordErrors.newPassword)}
-                  className={inputClass(passwordErrors.newPassword)}
-                />
-                <FieldError message={passwordErrors.newPassword} />
-                {passwordDraft.next && (
-                  <ul className="mt-3 space-y-1 text-xs">
-                    {passwordChecks.map((check) => (
-                      <li key={check.id} className={check.ok ? 'text-green-700' : 'text-[#989797]'}>
-                        {check.ok ? '✓' : '○'} {check.label}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <div>
-                <label htmlFor="pw-confirm" className="block text-sm font-semibold text-[#683B0D]">Confirm new password</label>
-                <input
-                  id="pw-confirm"
-                  type={passwordInputType}
-                  autoComplete="new-password"
-                  value={passwordDraft.confirm}
-                  onChange={(e) => { setPasswordDraft((p) => ({ ...p, confirm: e.target.value })); setPasswordErrors((p) => ({ ...p, confirm: undefined })) }}
-                  aria-invalid={Boolean(passwordErrors.confirm)}
-                  className={inputClass(passwordErrors.confirm)}
-                />
-                <FieldError message={passwordErrors.confirm} />
-              </div>
-              <label className="flex cursor-pointer items-center gap-2 text-sm text-[#989797]">
-                <input
-                  type="checkbox"
-                  checked={showPasswords}
-                  onChange={(e) => setShowPasswords(e.target.checked)}
-                  className="h-4 w-4 rounded border-[#CACACA] text-[#683B0D] focus:ring-[#CEA74E]"
-                />
-                Show passwords
-              </label>
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={savingPassword}
-                  className="rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E] disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {savingPassword ? 'Saving…' : 'Change password'}
-                </button>
-              </div>
-            </form>
           )}
         </div>
       </div>

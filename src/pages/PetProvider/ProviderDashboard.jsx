@@ -21,7 +21,7 @@ import NotificationModal from '../../components/NotificationModal.jsx';
 import MessagesTab from '../../components/MessagesTab.jsx';
 import { getConversations, startApprovedThread, startMessagesSync } from '../../Data/Messaging.jsx';
 import { usePresenceHeartbeat } from '../../Data/Presence.jsx';
-import { getCurrentUser } from '../../Data/Accounts.jsx';
+import { getCurrentUser, subscribeToUser } from '../../Data/Accounts.jsx';
 import {
   addListing,
   getApplicationsForProvider,
@@ -85,6 +85,10 @@ const ProviderDashboard = ({ openProfileOnMount }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
 
+  // Keep this page's copy of the signed-in person up to date (for example after the
+  // profile is saved), so everything that shows their details refreshes.
+  useEffect(() => subscribeToUser((next) => setUser(next)), []);
+
   // Only signed-in PROVIDERS belong here (guardians have their own dashboard).
   useEffect(() => {
     if (!user || user.role !== 'provider') navigate('/provider/login', { replace: true });
@@ -100,7 +104,7 @@ const ProviderDashboard = ({ openProfileOnMount }) => {
     setApplications(apps);
     setChatList(getConversations(user));
     return { pets, apps };
-  }, [user]);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load this provider's pets from Supabase when the dashboard opens.
   useEffect(() => {
@@ -116,7 +120,7 @@ const ProviderDashboard = ({ openProfileOnMount }) => {
       stopRequests();
       stopMessages();
     };
-  }, [user]);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // A guardian may send a request from another tab/window; pick it up.
   useEffect(() => {
@@ -138,7 +142,7 @@ const ProviderDashboard = ({ openProfileOnMount }) => {
       setApplications((prev) => (JSON.stringify(prev) === JSON.stringify(nextApps) ? prev : nextApps));
     }, 2500);
     return () => clearInterval(timer);
-  }, [user]);
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (openProfileOnMount) {
@@ -363,17 +367,29 @@ const ProviderDashboard = ({ openProfileOnMount }) => {
 
   const renderPets = () => (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      {/* Search bar with the "Add pet" button to its right */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        {petList.length > 0 && (
+          <label className="relative block w-full max-w-2xl flex-1">
+            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#989797]" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search your pets by name or breed..."
+              className="w-full rounded-xl border border-[#CACACA] bg-white py-3 pl-12 pr-4 text-sm shadow-sm focus:border-[#CEA74E] focus:outline-none focus:ring-2 focus:ring-[#CEA74E]/30 sm:text-base"
+            />
+          </label>
+        )}
         <button
           type="button"
           onClick={() => setShowAddPetModal(true)}
-          className="inline-flex items-center gap-2 rounded-full bg-[#683B0D] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
+          className="inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-[#683B0D] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
         >
           <Plus className="h-4 w-4" />
           Add pet for adoption
         </button>
       </div>
-      {petList.length > 0 && renderSearch('Search your pets by name or breed...')}
 
       <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
         {filteredPets.length > 0 ? (
@@ -484,7 +500,7 @@ const ProviderDashboard = ({ openProfileOnMount }) => {
 
   const renderProfile = () => (
     <div className="space-y-6">
-      <ProfileSection userRole="Provider" onEditClick={() => setShowProfileModal(true)} />
+      <ProfileSection userRole="Provider" profile={user} onEditClick={() => setShowProfileModal(true)} />
     </div>
   );
 
