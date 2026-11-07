@@ -174,7 +174,6 @@ const ProviderDashboard = ({ openProfileOnMount }) => {
     { id: 'applications', label: 'Applications', icon: Users, badge: pendingApplications || undefined },
     { id: 'messages', label: 'Messages', icon: MessageSquare, badge: unreadMessages || undefined },
     { id: 'reviews', label: 'Reviews & Ratings', icon: Star },
-    { id: 'donations', label: 'Donations', icon: Gift },
   ];
 
   const handleNavClick = (id) => {
