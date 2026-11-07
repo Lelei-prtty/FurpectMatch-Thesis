@@ -43,23 +43,24 @@ const FieldError = ({ message }) =>
 
 const tabs = ['Personal Information', 'Password']
 
-export default function Profile({ open, onClose, user, onUserChange }) {
+export default function ProfileModal({ open, onClose, user, onUserChange }) {
   const [activeTab, setActiveTab] = useState(tabs[0])
   const [profileDraft, setProfileDraft] = useState({ fullName: '', phone: '', location: '' })
   const [profileErrors, setProfileErrors] = useState({})
   const [profileNotice, setProfileNotice] = useState(null)
+  const [savingProfile, setSavingProfile] = useState(false)
   const [passwordDraft, setPasswordDraft] = useState({ current: '', next: '', confirm: '' })
   const [passwordErrors, setPasswordErrors] = useState({})
   const [passwordNotice, setPasswordNotice] = useState(null)
   const [savingPassword, setSavingPassword] = useState(false)
   const [showPasswords, setShowPasswords] = useState(false)
 
-  // Start from the saved account every time the modal opens.
+  // Fill the form from the saved account whenever the modal opens or the user's details arrive/change.
   useEffect(() => {
     if (!open || !user) return
     setActiveTab(tabs[0])
     setProfileDraft({
-      fullName: user.fullName,
+      fullName: user.fullName || user.full_name || '',
       phone: user.phone ? formatPhone(user.phone) : '',
       location: user.location || '',
     })
@@ -68,24 +69,33 @@ export default function Profile({ open, onClose, user, onUserChange }) {
     setPasswordDraft({ current: '', next: '', confirm: '' })
     setPasswordErrors({})
     setPasswordNotice(null)
-  }, [open, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, user?.id, user?.fullName, user?.full_name, user?.phone, user?.location]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) return null
 
-  const handleProfileSave = (event) => {
+  const handleProfileSave = async (event) => {
     event.preventDefault()
     setProfileNotice(null)
-    const result = updateProfile(user.id, profileDraft)
-    if (!result.ok) {
-      setProfileErrors(result.errors || {})
-      if (!result.errors) setProfileNotice({ tone: 'error', text: result.message })
+    setSavingProfile(true)
+    let result
+    try {
+      result = await updateProfile(user.id, profileDraft)
+    } catch (err) {
+      result = { ok: false, message: err?.message || 'Could not save your profile.' }
+    }
+    setSavingProfile(false)
+    if (!result?.ok) {
+      setProfileErrors(result?.errors || {})
+      if (!result?.errors) {
+        setProfileNotice({ tone: 'error', text: result?.message || 'Could not save your profile.' })
+      }
       return
     }
     setProfileErrors({})
     setProfileDraft({
-      fullName: result.user.fullName,
+      fullName: result.user.fullName || '',
       phone: result.user.phone ? formatPhone(result.user.phone) : '',
-      location: result.user.location,
+      location: result.user.location || '',
     })
     onUserChange?.(result.user)
     setProfileNotice({ tone: 'success', text: 'Your profile has been updated.' })
@@ -115,6 +125,7 @@ export default function Profile({ open, onClose, user, onUserChange }) {
   const passwordChecks = getPasswordChecks(passwordDraft.next, { email: user?.email, fullName: user?.fullName })
   const passwordInputType = showPasswords ? 'text' : 'password'
   const memberSince = formatMemberSince(user?.createdAt)
+  const displayName = user?.fullName || user?.full_name || ''
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-6 sm:px-6">
@@ -159,10 +170,10 @@ export default function Profile({ open, onClose, user, onUserChange }) {
                     className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-[#CEA74E]/25 text-2xl font-bold text-[#683B0D]"
                     aria-hidden="true"
                   >
-                    {initialsOf(user.fullName)}
+                    {initialsOf(displayName)}
                   </div>
                   <div className="min-w-0">
-                    <p className="truncate text-lg font-semibold text-[#683B0D]">{user.fullName}</p>
+                    <p className="truncate text-lg font-semibold text-[#683B0D]">{displayName}</p>
                     <p className="text-sm text-[#989797]">Pet Provider</p>
                   </div>
                 </div>
@@ -188,7 +199,7 @@ export default function Profile({ open, onClose, user, onUserChange }) {
                     <label htmlFor="pf-email" className="block text-sm font-semibold text-[#683B0D]">Email</label>
                     <input
                       id="pf-email"
-                      value={user.email}
+                      value={user.email || ''}
                       readOnly
                       className="mt-2 w-full cursor-not-allowed rounded-3xl border border-[#CACACA] bg-[#CACACA]/20 px-4 py-3 text-sm text-[#989797] outline-none"
                     />
@@ -222,9 +233,10 @@ export default function Profile({ open, onClose, user, onUserChange }) {
                 <div className="flex justify-end">
                   <button
                     type="submit"
-                    className="rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
+                    disabled={savingProfile}
+                    className="rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    Save changes
+                    {savingProfile ? 'Saving…' : 'Save changes'}
                   </button>
                 </div>
               </form>

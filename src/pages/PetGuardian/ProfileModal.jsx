@@ -55,6 +55,7 @@ export default function ProfileModal({ open, onClose, user, onUserChange, initia
   const [profileDraft, setProfileDraft] = useState({ fullName: '', phone: '', location: '' })
   const [profileErrors, setProfileErrors] = useState({})
   const [profileNotice, setProfileNotice] = useState(null) // { tone, text }
+  const [savingProfile, setSavingProfile] = useState(false)
 
   // Change-password form
   const [passwordDraft, setPasswordDraft] = useState({ current: '', next: '', confirm: '' })
@@ -83,26 +84,35 @@ export default function ProfileModal({ open, onClose, user, onUserChange, initia
     setPasswordErrors({})
     setPasswordNotice(null)
     setShowPasswords(false)
-  }, [open, user?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, user?.id, user?.fullName, user?.phone, user?.location]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!open) return null
 
   const tabs = ['Personal Information', 'Preferences & Lifestyle']
 
-  const handleProfileSave = (event) => {
+  const handleProfileSave = async (event) => {
     event.preventDefault()
     setProfileNotice(null)
-    const result = updateProfile(user.id, profileDraft)
-    if (!result.ok) {
-      setProfileErrors(result.errors || {})
-      if (!result.errors) setProfileNotice({ tone: 'error', text: result.message })
+    setSavingProfile(true)
+    let result
+    try {
+      result = await updateProfile(user.id, profileDraft)
+    } catch (err) {
+      result = { ok: false, message: 'We couldn’t save your changes. Please try again.' }
+    }
+    setSavingProfile(false)
+    if (!result?.ok) {
+      setProfileErrors(result?.errors || {})
+      if (!result?.errors) {
+        setProfileNotice({ tone: 'error', text: result?.message || 'We couldn’t save your changes.' })
+      }
       return
     }
     setProfileErrors({})
     setProfileDraft({
-      fullName: result.user.fullName,
+      fullName: result.user.fullName || '',
       phone: result.user.phone ? formatPhone(result.user.phone) : '',
-      location: result.user.location,
+      location: result.user.location || '',
     })
     onUserChange?.(result.user)
     setProfileNotice({ tone: 'success', text: 'Your profile has been updated.' })
@@ -301,9 +311,10 @@ export default function ProfileModal({ open, onClose, user, onUserChange, initia
                       <div className="mt-6 flex justify-end">
                         <button
                           type="submit"
-                          className="rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
+                          disabled={savingProfile}
+                          className="rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E] disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          Save changes
+                          {savingProfile ? 'Saving…' : 'Save changes'}
                         </button>
                       </div>
                     </form>
@@ -447,8 +458,7 @@ export default function ProfileModal({ open, onClose, user, onUserChange, initia
                   )}
                 </div>
               </div>
-              </div>
-
+            </div>
           )}
         </div>
       </div>

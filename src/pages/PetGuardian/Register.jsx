@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import PetPreferencesForm from '../../components/Petpreferencesform.jsx'
 import TopMatchesModal from '../../components/TopMatchesModal.jsx'
+import TermsModal from '../../components/TermsModal.jsx'
 import { DEFAULT_PET_PREFERENCES, withPetTypes } from '../../Data/Petpreferencesoptions.jsx'
 import { savePetPreferences } from '../../Data/Petpreferencesstorage.jsx'
 import {
@@ -79,6 +80,7 @@ export default function GuardianRegister() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
+  const [showTerms, setShowTerms] = useState(false)
 
   // Validation display: a field's error shows once it's been touched (left) or
   // after the person tries to continue.
@@ -448,14 +450,13 @@ export default function GuardianRegister() {
                       />
                       <span>
                         I have read and agree to the{' '}
-                        <Link
-                          to="/terms"
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => setShowTerms(true)}
                           className="font-semibold underline hover:text-[#CEA74E]"
                         >
                           Terms and Conditions
-                        </Link>
+                        </button>
                         .
                       </span>
                     </label>
@@ -523,6 +524,16 @@ export default function GuardianRegister() {
           saveFailed={matches.saveFailed}
           firstName={firstName.trim()}
           onContinue={() => navigate('/guardian/dashboard', { replace: true })}
+        />
+      )}
+      {showTerms && (
+        <TermsModal
+          role="guardian"
+          onAgree={() => {
+            setTermsAccepted(true)
+            setShowTerms(false)
+          }}
+          onClose={() => setShowTerms(false)}
         />
       )}
     </div>

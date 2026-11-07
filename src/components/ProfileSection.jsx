@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Edit } from 'lucide-react'
-import { formatPhone } from '../Data/Accounts.jsx'
+import { formatPhone, getCurrentUser, subscribeToUser } from '../Data/Accounts.jsx'
 
 const initialsOf = (name) =>
   (name || '')
@@ -19,14 +19,25 @@ const formatMemberSince = (iso) => {
 
 // Shows the signed-in person's real account details. Anything we don't have is
 // shown as "Not provided" -- never a made-up value.
+// It listens for changes, so it updates right after the profile is saved.
 export default function ProfileSection({ userRole = 'Guardian', profile, onEditClick }) {
+  const [liveUser, setLiveUser] = useState(getCurrentUser())
+
+  useEffect(() => {
+    setLiveUser(getCurrentUser()) // pick up anything that loaded after the first render
+    return subscribeToUser(setLiveUser)
+  }, [])
+
+  // Prefer the freshest signed-in account; fall back to what the parent passed in.
+  const account = liveUser || profile
+
   const userInfo = {
-    name: profile?.fullName || '',
-    email: profile?.email || '',
-    phone: profile?.phone ? formatPhone(profile.phone) : '',
-    location: profile?.location || '',
+    name: account?.fullName || '',
+    email: account?.email || '',
+    phone: account?.phone ? formatPhone(account.phone) : '',
+    location: account?.location || '',
     role: userRole === 'Guardian' ? 'Pet Guardian' : 'Pet Provider',
-    memberSince: formatMemberSince(profile?.createdAt),
+    memberSince: formatMemberSince(account?.createdAt),
   }
 
   const details = [
@@ -37,19 +48,18 @@ export default function ProfileSection({ userRole = 'Guardian', profile, onEditC
   ]
 
   return (
-    <div className="rounded-3xl bg-white p-6 shadow-sm border border-[#CACACA]">
-     {/* Edit profile button */}
+    <div className="relative rounded-3xl border border-[#CACACA] bg-white p-6 pb-20 shadow-sm">
+      {/* Edit profile button */}
       <div className="absolute bottom-4 right-4">
-    <button
-      type="button"
-      onClick={onEditClick}
-      className="inline-flex items-center gap-2 rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
-    >
-      <Edit className="h-4 w-4" />
-      Edit Profile
-    </button>
-  </div>
-
+        <button
+          type="button"
+          onClick={onEditClick}
+          className="inline-flex items-center gap-2 rounded-full bg-[#683B0D] px-6 py-3 text-sm font-semibold text-white transition hover:bg-[#CEA74E]"
+        >
+          <Edit className="h-4 w-4" />
+          Edit Profile
+        </button>
+      </div>
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
         {/* Left: Avatar and Basic Info */}
@@ -69,9 +79,9 @@ export default function ProfileSection({ userRole = 'Guardian', profile, onEditC
         </div>
 
         {/* Right: Details Grid */}
-        <div className="flex-1 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid flex-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {details.map((item) => (
-            <div key={item.label} className="rounded-3xl border border-[#CACACA] p-4 bg-[#CACACA]/10">
+            <div key={item.label} className="rounded-3xl border border-[#CACACA] bg-[#CACACA]/10 p-4">
               <p className="text-xs uppercase tracking-[0.2em] text-[#989797]">{item.label}</p>
               {item.value ? (
                 <p className={`mt-2 text-sm font-semibold text-[#683B0D] ${item.breakAll ? 'break-all' : ''}`}>{item.value}</p>

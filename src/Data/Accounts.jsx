@@ -15,6 +15,8 @@
 //    decides whether the session survives closing the browser.
 //  - getCurrentUser() is still synchronous. It reads a copy kept in memory that
 //    initAuth() fills before the app first renders (see main.jsx).
+//  - subscribeToUser(listener) lets a screen re-render whenever the signed-in
+//    person's details change (for example after saving the profile).
 //
 // Names, terms and verification:
 //  - Accounts now store first_name and last_name. full_name is still filled in by the
@@ -34,7 +36,7 @@ const EMAIL_TAKEN = 'An account with this email already exists. Try logging in i
 
 // Bump this whenever the Terms and Conditions text changes. Terms.jsx shows it,
 // and every new account records the version that was accepted.
-export const TERMS_VERSION = '2026-10'
+export const TERMS_VERSION = '2026-11'
 
 // ---------------------------------------------------------------------------
 // Normalizers
@@ -199,6 +201,31 @@ const PROFILE_COLUMNS =
 
 let currentUser = null
 
+const userListeners = new Set()
+
+/**
+ * Lets a screen re-render when the signed-in person's details change.
+ * Returns a function that stops listening (use it as a useEffect cleanup).
+ */
+export function subscribeToUser(listener) {
+  userListeners.add(listener)
+  return () => {
+    userListeners.delete(listener)
+  }
+}
+
+/** Updates the in-memory user and tells every listening screen. */
+function setCurrentUser(next) {
+  currentUser = next
+  userListeners.forEach((listener) => {
+    try {
+      listener(next)
+    } catch (error) {
+      console.error('User listener failed', error)
+    }
+  })
+}
+
 function toUser(authUser, profile) {
   return {
     id: authUser.id,
@@ -246,10 +273,10 @@ export function initAuth() {
       if (!isSupabaseConfigured) return
       try {
         const { data } = await supabase.auth.getSession()
-        currentUser = await userFromSession(data.session)
+        setCurrentUser(await userFromSession(data.session))
       } catch (error) {
         console.error('Failed to restore session', error)
-        currentUser = null
+        setCurrentUser(null)
       }
 
       supabase.auth.onAuthStateChange((event) => {
@@ -260,12 +287,28 @@ export function initAuth() {
         setTimeout(async () => {
           const { data } = await supabase.auth.getSession()
           const next = await userFromSession(data.session)
-          if (JSON.stringify(next) !== JSON.stringify(currentUser)) currentUser = next
+          if (JSON.stringify(next) !== JSON.stringify(currentUser)) setCurrentUser(next)
         }, 0)
       })
     })()
   }
   return initPromise
+}
+
+/**
+ * Re-reads the signed-in person's profile (for example after a verification decision) and
+ * resolves the fresh user object, or the current one if it can't be refreshed.
+ */
+export async function refreshCurrentUser() {
+  if (!isSupabaseConfigured) return currentUser
+  try {
+    const { data } = await supabase.auth.getSession()
+    const next = await userFromSession(data.session)
+    if (next) setCurrentUser(next)
+  } catch (error) {
+    console.error('Failed to refresh the profile', error)
+  }
+  return currentUser
 }
 
 /** The signed-in person (without any password data), or null. */
@@ -396,7 +439,7 @@ export async function createAccount({
   if (!user) {
     return { ok: false, reason: 'profile', message: 'Your account was created, but we couldn’t load it. Please try logging in.' }
   }
-  currentUser = user
+  setCurrentUser(user)
   return { ok: true, user }
 }
 
@@ -483,7 +526,7 @@ export async function authenticate(email, password, role = 'guardian') {
   }
   if (user.role !== role) {
     await supabase.auth.signOut({ scope: 'local' }).catch(() => {})
-    currentUser = null
+    setCurrentUser(null)
     return {
       ok: false,
       reason: 'wrong-role',
@@ -492,7 +535,7 @@ export async function authenticate(email, password, role = 'guardian') {
   }
 
   clearFailures(target)
-  currentUser = user
+  setCurrentUser(user)
   return { ok: true, user }
 }
 
@@ -507,7 +550,7 @@ export function startSession(user, remember = false) {
 }
 
 export function endSession() {
-  currentUser = null // the UI treats you as signed out immediately
+  setCurrentUser(null) // the UI treats you as signed out immediately
   supabase.auth.signOut({ scope: 'local' }).catch((error) => {
     console.error('Sign-out failed', error)
     clearStoredSession()
@@ -566,8 +609,9 @@ export async function updateProfile(userId, { fullName, firstName, lastName, pho
       console.error('Profile update failed', error)
       return { ok: false, reason: 'server', message: 'We couldn’t save your changes. Please try again.' }
     }
-    currentUser = toUser({ id: userId, email: currentUser.email }, data)
-    return { ok: true, user: currentUser }
+    const updated = toUser({ id: userId, email: currentUser.email }, data)
+    setCurrentUser(updated)
+    return { ok: true, user: updated }
   } catch (error) {
     console.error('Profile update failed', error)
     return NETWORK_ERROR

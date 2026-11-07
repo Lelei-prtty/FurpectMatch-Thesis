@@ -12,8 +12,10 @@ import {
   validateEmail,
   validatePassword,
   validateNamePart,
+  getPasswordChecks,
   TERMS_VERSION,
 } from '../../Data/Accounts.jsx'
+import TermsModal from '../../components/TermsModal.jsx'
 
 const DEFAULT_PET_INFO = {
   name: '',
@@ -45,6 +47,7 @@ export default function ProviderRegister() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
+  const [showTerms, setShowTerms] = useState(false)
 
   // Step 2 — pet information
   const [petInfo, setPetInfo] = useState(DEFAULT_PET_INFO)
@@ -64,6 +67,7 @@ export default function ProviderRegister() {
   // Validation is derived from the fields, shown once the person has tried to continue.
   // The database also keeps a combined name, so everything that shows full_name keeps working.
   const fullName = `${firstName.trim()} ${lastName.trim()}`.trim()
+  const passwordChecks = getPasswordChecks(password, { email, fullName })
   const emailTaken = !validateEmail(email) && isEmailTaken(email)
   const errors = {
     firstName: validateNamePart(firstName, 'first name'),
@@ -331,6 +335,7 @@ export default function ProviderRegister() {
                         id="reg-password"
                         autoComplete="new-password"
                         aria-invalid={Boolean(shownError('password'))}
+                        aria-describedby="reg-password-rules"
                         placeholder="Create a password"
                         className={`w-full rounded-3xl border ${shownError('password') ? 'border-red-400' : 'border-[#CACACA]'} bg-white px-4 py-3 pr-12 text-sm text-[#683B0D] outline-none focus:border-[#CEA74E] focus:ring-2 focus:ring-[#CACACA]/20`}
                       />
@@ -353,7 +358,14 @@ export default function ProviderRegister() {
                         )}
                       </button>
                     </div>
-                                    {shownError('password') && (
+                                    <ul id="reg-password-rules" className="mt-3 grid gap-1 text-xs font-normal sm:grid-cols-2">
+                      {passwordChecks.map((check) => (
+                        <li key={check.id} className={check.ok ? 'text-green-700' : 'text-[#989797]'}>
+                          <span aria-hidden="true">{check.ok ? '✓' : '○'}</span> {check.label}
+                        </li>
+                      ))}
+                    </ul>
+                    {shownError('password') && (
                     <p role="alert" className="mt-2 text-xs font-medium text-red-600">{shownError('password')}</p>
                   )}
                   </label>
@@ -409,14 +421,13 @@ export default function ProviderRegister() {
                       />
                       <span>
                         I have read and agree to the{' '}
-                        <Link
-                          to="/terms"
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => setShowTerms(true)}
                           className="font-semibold underline hover:text-[#CEA74E]"
                         >
                           Terms and Conditions
-                        </Link>
+                        </button>
                         .
                       </span>
                     </label>
@@ -673,6 +684,16 @@ export default function ProviderRegister() {
           </div>
         </div>
       </div>
+      {showTerms && (
+        <TermsModal
+          role="provider"
+          onAgree={() => {
+            setTermsAccepted(true)
+            setShowTerms(false)
+          }}
+          onClose={() => setShowTerms(false)}
+        />
+      )}
     </div>
   )
 }
