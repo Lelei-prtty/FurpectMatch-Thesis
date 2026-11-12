@@ -33,6 +33,11 @@ import { MODEL_SPECIES, preferencesForModel } from '../../Data/Petpreferencesopt
 import { addFavorite, loadFavorites, removeFavorite } from '../../Data/Favorites.jsx'
 import { ALL, filterPets, getFacetOptions, hasActiveFilters } from '../../utils/petFilters.js'
 
+// The recommender API's dataset pets (the thesis survey data).
+// false = the site only shows pets that providers added in Supabase (use this for real users).
+// true  = also show the dataset pets and the model's recommendations (use this to demo the model).
+const SHOW_DATASET_PETS = false
+
 // Small round pet avatar for the applications list. Falls back to the pet's
 // first letter when there's no photo (or the photo fails to load).
 function Avatar({ src, name }) {
@@ -192,9 +197,13 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
   const [apiPets, setApiPets] = useState([])
   // ... plus the pets providers have listed in the app (still marked Available).
   const [providerPets, setProviderPets] = useState(() => getPublicListings())
-  // What the guardian browses: both together, newest provider listings first.
-  const pets = useMemo(() => [...providerPets, ...apiPets], [providerPets, apiPets])
-  const [petsLoading, setPetsLoading] = useState(true)
+  // What the guardian browses: the provider listings (newest first), plus the dataset
+  // pets only when SHOW_DATASET_PETS is on.
+  const pets = useMemo(
+    () => (SHOW_DATASET_PETS ? [...providerPets, ...apiPets] : providerPets),
+    [providerPets, apiPets]
+  )
+  const [petsLoading, setPetsLoading] = useState(SHOW_DATASET_PETS)
   const [petsError, setPetsError] = useState(null)
 
   // Favorites are saved in Supabase, so they are still there after a refresh or on another device.
@@ -225,6 +234,13 @@ export default function GuardianDashboard({ openProfileOnMount, openMessageNameO
 
   // 1) The pet catalogue
   useEffect(() => {
+    // Dataset pets are switched off: nothing to load, and no recommendations to wait for.
+    if (!SHOW_DATASET_PETS) {
+      setPetsLoading(false)
+      setRecsLoading(false)
+      return undefined
+    }
+
     let cancelled = false
 
     async function loadPets() {
